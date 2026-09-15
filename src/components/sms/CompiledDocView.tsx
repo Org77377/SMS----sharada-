@@ -300,44 +300,41 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
                               >
                                 Topics
                               </span>
-                              <div style={{ marginTop: 8 }}>
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: 6,
+                                }}
+                              >
                                 {topics.map((tp, ti) => (
-                                  <div
+                                  <span
                                     key={ti}
                                     style={{
-                                      display: "flex",
-                                      alignItems: "flex-start",
-                                      gap: 8,
-                                      padding: "6px 10px",
-                                      marginBottom: 3,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      padding: "3px 9px",
                                       background: C.surface,
-                                      borderRadius: 5,
-                                      borderLeft: `3px solid ${C.primary}`,
+                                      borderRadius: 999,
+                                      border: `1px solid ${C.line}`,
+                                      fontSize: 11.5,
+                                      lineHeight: 1.4,
+                                      color: C.inkSoft,
                                     }}
                                   >
                                     <span
                                       style={{
-                                        flex: "0 0 auto",
-                                        minWidth: 18,
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontWeight: 700,
                                         color: C.primary,
-                                        textAlign: "right",
                                       }}
                                     >
                                       {ti + 1}
                                     </span>
-                                    <span
-                                      style={{
-                                        flex: 1,
-                                        fontSize: 12,
-                                        lineHeight: 1.5,
-                                        color: C.inkSoft,
-                                      }}
-                                    >
-                                      {tp}
-                                    </span>
-                                  </div>
+                                    {tp}
+                                  </span>
                                 ))}
                               </div>
                               {u.learningObjectives && (

@@ -197,6 +197,22 @@ async function main() {
         createdById: omkar.id,
       },
     });
+    // Term 2 approved unit so "All Terms" shows both Term 1 and Term 2
+    await db.unit.create({
+      data: {
+        gradeId: grades[8].id,
+        subjectId: csSubject.id,
+        academicYearId: ay.id,
+        term: "Term 2",
+        unitName: "HTML & CSS Basics",
+        topics:
+          "HTML structure and tags; Attributes and hyperlinks; Lists, tables and forms; CSS selectors and properties; Inline vs block elements; Box model and spacing.",
+        learningObjectives:
+          "Build a simple webpage using HTML; Apply basic CSS styling; Understand the box model.",
+        status: "APPROVED",
+        createdById: omkar.id,
+      },
+    });
   }
   console.log("✓ Sample syllabus units (draft/submitted/approved)");
 

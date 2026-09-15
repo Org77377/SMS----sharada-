@@ -191,12 +191,9 @@ export function CoordinatorDashboard({ user: _user }: Props) {
                       const topicsHtml =
                         topicList.length === 0
                           ? ""
-                          : `<div style="margin-top:8px;">${topicList
+                          : `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${topicList
                               .map(
-                                (tp, ti) => `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;margin-bottom:3px;background:#f1f5f9;border-radius:5px;border-left:3px solid #2563eb;">
-                                <span style="flex:0 0 auto;min-width:18px;font-size:11px;font-weight:700;color:#2563eb;text-align:right;">${ti + 1}</span>
-                                <span style="flex:1;font-size:12px;line-height:1.5;color:#334155;">${escapeHtml(tp)}</span>
-                              </div>`
+                                (tp, ti) => `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;background:#f1f5f9;border-radius:999px;border:1px solid #e2e8f0;font-size:11.5px;line-height:1.4;color:#334155;"><span style="font-size:10px;font-weight:700;color:#2563eb;">${ti + 1}</span>${escapeHtml(tp)}</span>`
                               )
                               .join("")}</div>`;
                       const objectivesHtml = u.learningObjectives

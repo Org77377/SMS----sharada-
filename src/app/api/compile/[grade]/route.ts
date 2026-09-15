@@ -53,22 +53,28 @@ export async function GET(
     subj.terms.get(u.term)!.push(u);
   }
 
-  const subjects = Array.from(bySubject.values()).map((s) => ({
-    subject: s.subject,
-    teacherName: s.terms.values().next().value?.[0]?.createdBy?.name ?? "—",
-    terms: TERMS.map((t) => {
-      const list = s.terms.get(t) ?? [];
-      return {
-        term: t,
-        units: list.map((u) => ({
-          id: u.id,
-          unitName: u.unitName,
-          topics: u.topics,
-          learningObjectives: u.learningObjectives || "",
-        })),
-      };
-    }),
-  }));
+  const subjects = Array.from(bySubject.values()).map((s) => {
+    const teacherName = s.terms.values().next().value?.[0]?.createdBy?.name ?? "—";
+    // Only include terms that actually have units. When a specific term is
+    // selected, the API filter already excluded the other term's units, so
+    // this naturally shows only the selected term. When "All Terms" is
+    // selected, only terms with approved units are listed (no empty headings).
+    const terms = (termFilter ? [termFilter] : TERMS)
+      .filter((t) => s.terms.has(t) && s.terms.get(t)!.length > 0)
+      .map((t) => {
+        const list = s.terms.get(t)!;
+        return {
+          term: t,
+          units: list.map((u) => ({
+            id: u.id,
+            unitName: u.unitName,
+            topics: u.topics,
+            learningObjectives: u.learningObjectives || "",
+          })),
+        };
+      });
+    return { subject: s.subject, teacherName, terms };
+  });
 
   return NextResponse.json({
     school: {
