@@ -37,3 +37,23 @@ Stage Summary:
 - Production-ready SMS delivered end-to-end. Login credentials (all users): password `sharada123`. Demo usernames: superadmin, principal, coordinator, omkar, lakshmi, ramesh, geeta, suresh, anita, vijay, padma, nagaraj, shobha.
 - Branding: header "Sharada Public School · Vijayapura 586-109", footer "Architected & Developed by Omkar RG | Dept. of CS, Sharada Public School".
 - Printable compiled grade syllabus (parent-facing) via Print + one-click PDF (isolated iframe, html2pdf) + DOCX (Word-compatible HTML).
+
+---
+Task ID: 2
+Agent: main
+Task: Migrate database from SQLite to PostgreSQL
+
+Work Log:
+- Switched prisma/schema.prisma datasource provider from "sqlite" to "postgresql".
+- Created prisma/schema.sql — full idempotent PostgreSQL DDL for all 9 tables (Role, User, Grade, Subject, AcademicYear, TeacherAssignment, Unit, Notification, AuditLog) with primary keys, foreign keys, compound unique indexes, single-column indexes, and a v_status_grid helper view.
+- Rewrote .env with PostgreSQL connection string (postgresql://postgres:postgres@localhost:5432/sharada_sms?schema=public) plus inline docs on URL-encoding special chars.
+- Added .env.example documenting 6 connection variants (default, trust auth, custom user, non-default port, unix socket, remote LAN server).
+- Verified `bun run db:generate` generates the Prisma client cleanly for postgresql.
+- Verified `bun run lint` passes with zero errors/warnings.
+- Runtime verification: sandbox has no PostgreSQL server and no root to install one. Temporarily flipped provider to sqlite + sqlite DATABASE_URL, ran db:push + seed (fresh DB), then ran an all-in-one agent-browser verification script (server reaps between tool calls). Verified: login page renders, teacher login (omkar) loads dashboard with seeded assignments, coordinator login shows status grid "In Review 1/3" for CS Grade 8, review queue shows seeded SUBMITTED unit "Computer Fundamentals" with Approve button, Compile & Export tab renders with Print/PDF/DOCX. No errors in dev.log. Then FLIPPED BACK to postgresql as the shipped state and regenerated the client.
+- Prisma queries are fully provider-agnostic (only @default(cuid()), @unique, @@unique compound, @relation onDelete:Cascade, DateTime defaults — all supported on both providers), so the sqlite verification validates the postgres app logic.
+
+Stage Summary:
+- Shipped code is 100% PostgreSQL-targeted. Files: prisma/schema.prisma (provider=postgresql), prisma/schema.sql (full DDL), .env (postgres URL), .env.example (6 connection variants).
+- User runs `bun run db:push` against their local Postgres (managed via DBeaver) to create tables, then `bun prisma/seed.ts` to load roles/grades/subjects/users/sample data.
+- Demo credentials unchanged: password `sharada123` for all users (superadmin/principal/coordinator/omkar/lakshmi/...).
