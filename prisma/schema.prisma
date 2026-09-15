@@ -1,0 +1,122 @@
+// Sharada Public School SMS — Prisma schema (SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  name      String   @unique // Superadmin | Principal | Coordinator | Teacher
+  users     User[]
+  notifications Notification[]
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  passwordHash String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignments      TeacherAssignment[]
+  units            Unit[]
+  sentNotifications Notification[] @relation("NotificationSender")
+  receivedNotifications Notification[] @relation("NotificationRecipient")
+}
+
+model Grade {
+  id           String   @id @default(cuid())
+  gradeNumber   Int      @unique // 4..10
+  displayName   String   // "Grade 4"
+  assignments  TeacherAssignment[]
+  units        Unit[]
+  createdAt     DateTime @default(now())
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  assignments TeacherAssignment[]
+  units       Unit[]
+  createdAt   DateTime @default(now())
+}
+
+model AcademicYear {
+  id          String   @id @default(cuid())
+  year        String   @unique // "2025-2026"
+  active      Boolean  @default(false)
+  assignments TeacherAssignment[]
+  units       Unit[]
+  createdAt   DateTime @default(now())
+}
+
+model TeacherAssignment {
+  id              String   @id @default(cuid())
+  teacherId       String
+  gradeId         String
+  subjectId       String
+  academicYearId  String
+  teacher         User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  grade           Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicYear    AcademicYear @relation(fields: [academicYearId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@unique([teacherId, gradeId, subjectId, academicYearId])
+}
+
+model Unit {
+  id                 String   @id @default(cuid())
+  gradeId            String
+  subjectId          String
+  academicYearId     String
+  term               String   // "Term 1" | "Term 2"
+  unitName           String
+  topics            String
+  learningObjectives String?
+  status             String   @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REJECTED
+  feedback           String?
+  createdById        String
+  grade              Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject            Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicYear       AcademicYear @relation(fields: [academicYearId], references: [id])
+  createdBy          User     @relation(fields: [createdById], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([gradeId, subjectId, term, unitName, academicYearId])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  senderId      String
+  recipientId   String?  // null => broadcast to a role
+  targetRoleId  String?  // role-based broadcast target
+  title         String
+  message       String
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  sender    User     @relation("NotificationSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User?    @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  targetRole Role?   @relation(fields: [targetRoleId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}

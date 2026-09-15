@@ -1,0 +1,227 @@
+import { db } from "../src/lib/db";
+import { hashPassword, ROLES } from "../src/lib/auth";
+
+const SUBJECTS = [
+  { name: "Kannada", code: "KAN" },
+  { name: "English", code: "ENG" },
+  { name: "Hindi", code: "HIN" },
+  { name: "Mathematics", code: "MAT" },
+  { name: "Science", code: "SCI" },
+  { name: "Social Science", code: "SST" },
+  { name: "Computer Science", code: "CSC" },
+  { name: "Physical Education", code: "PED" },
+  { name: "General Knowledge", code: "GK" },
+  { name: "Art", code: "ART" },
+];
+
+async function main() {
+  console.log("🌱 Seeding Sharada Public School SMS...");
+
+  // Roles
+  const roles = {} as Record<string, { id: string }>;
+  for (const name of Object.values(ROLES)) {
+    const role = await db.role.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+    roles[name] = role;
+  }
+  console.log("✓ Roles");
+
+  // Grades 4..10
+  const grades = {} as Record<number, { id: string }>;
+  for (let g = 4; g <= 10; g++) {
+    const grade = await db.grade.upsert({
+      where: { gradeNumber: g },
+      update: { displayName: `Grade ${g}` },
+      create: { gradeNumber: g, displayName: `Grade ${g}` },
+    });
+    grades[g] = grade;
+  }
+  console.log("✓ Grades 4–10");
+
+  // Subjects
+  for (const s of SUBJECTS) {
+    await db.subject.upsert({
+      where: { code: s.code },
+      update: { name: s.name },
+      create: s,
+    });
+  }
+  const allSubjects = await db.subject.findMany();
+  console.log(`✓ ${allSubjects.length} subjects`);
+
+  // Academic year
+  const ay = await db.academicYear.upsert({
+    where: { year: "2025-2026" },
+    update: { active: true },
+    create: { year: "2025-2026", active: true },
+  });
+  console.log("✓ Academic year 2025-2026");
+
+  // ---- Demo users ----
+  // Default password for all demo accounts: sharada123
+  const defaultPassword = await hashPassword("sharada123");
+
+  const superadmin = await db.user.upsert({
+    where: { username: "superadmin" },
+    update: {},
+    create: {
+      name: "System Administrator",
+      username: "superadmin",
+      passwordHash: defaultPassword,
+      roleId: roles[ROLES.SUPERADMIN].id,
+      active: true,
+    },
+  });
+
+  const principal = await db.user.upsert({
+    where: { username: "principal" },
+    update: {},
+    create: {
+      name: "Dr. Sumati Patil",
+      username: "principal",
+      passwordHash: defaultPassword,
+      roleId: roles[ROLES.PRINCIPAL].id,
+      active: true,
+    },
+  });
+
+  const coordinator = await db.user.upsert({
+    where: { username: "coordinator" },
+    update: {},
+    create: {
+      name: "Mahadev Desai",
+      username: "coordinator",
+      passwordHash: defaultPassword,
+      roleId: roles[ROLES.COORDINATOR].id,
+      active: true,
+    },
+  });
+  console.log("✓ Admin / Principal / Coordinator users");
+
+  // Teachers with assignments. password: sharada123 for all.
+  const teachers = [
+    { name: "Omkar RG", username: "omkar", subject: "Computer Science", grades: [6, 7, 8, 9, 10] },
+    { name: "Lakshmi Joshi", username: "lakshmi", subject: "Mathematics", grades: [4, 5, 6] },
+    { name: "Ramesh Kulkarni", username: "ramesh", subject: "Science", grades: [7, 8, 9] },
+    { name: "Geeta Nadagouda", username: "geeta", subject: "English", grades: [4, 5, 6, 7] },
+    { name: "Suresh Hiremath", username: "suresh", subject: "Social Science", grades: [8, 9, 10] },
+    { name: "Anita Bommanahalli", username: "anita", subject: "Kannada", grades: [5, 6, 7, 8] },
+    { name: "Vijay Mahantesh", username: "vijay", subject: "Hindi", grades: [4, 5, 6] },
+    { name: "Padma Athani", username: "padma", subject: "Mathematics", grades: [7, 8, 9, 10] },
+    { name: "Nagaraj Badami", username: "nagaraj", subject: "Science", grades: [4, 5, 6] },
+    { name: "Shobha Ilkal", username: "shobha", subject: "Computer Science", grades: [4, 5] },
+  ];
+
+  for (const t of teachers) {
+    const user = await db.user.upsert({
+      where: { username: t.username },
+      update: { name: t.name, roleId: roles[ROLES.TEACHER].id },
+      create: {
+        name: t.name,
+        username: t.username,
+        passwordHash: defaultPassword,
+        roleId: roles[ROLES.TEACHER].id,
+        active: true,
+      },
+    });
+    const subject = allSubjects.find((s) => s.name === t.subject)!;
+    for (const g of t.grades) {
+      await db.teacherAssignment.upsert({
+        where: {
+          teacherId_gradeId_subjectId_academicYearId: {
+            teacherId: user.id,
+            gradeId: grades[g].id,
+            subjectId: subject.id,
+            academicYearId: ay.id,
+          },
+        },
+        update: {},
+        create: {
+          teacherId: user.id,
+          gradeId: grades[g].id,
+          subjectId: subject.id,
+          academicYearId: ay.id,
+        },
+      });
+    }
+  }
+  console.log(`✓ ${teachers.length} teachers with assignments`);
+
+  // Sample submitted units for a teacher (Omkar - Computer Science, Grade 8, Term 1)
+  const omkar = await db.user.findUnique({ where: { username: "omkar" } });
+  const csSubject = allSubjects.find((s) => s.name === "Computer Science")!;
+  if (omkar) {
+    await db.unit.create({
+      data: {
+        gradeId: grades[8].id,
+        subjectId: csSubject.id,
+        academicYearId: ay.id,
+        term: "Term 1",
+        unitName: "Computer Fundamentals",
+        topics:
+          "History of computers; Generations of computers; Characteristics and limitations; Basic architecture (Input, Process, Output, Storage); Types of memory (RAM, ROM, Cache).",
+        learningObjectives:
+          "Identify the generations of computers; Explain the basic architecture; Differentiate between RAM and ROM.",
+        status: "SUBMITTED",
+        createdById: omkar.id,
+      },
+    });
+    await db.unit.create({
+      data: {
+        gradeId: grades[8].id,
+        subjectId: csSubject.id,
+        academicYearId: ay.id,
+        term: "Term 1",
+        unitName: "Operating Systems & Windows",
+        topics:
+          "Definition and functions of an OS; Types of OS; Desktop, icons, taskbar; File and folder management; Control panel basics.",
+        learningObjectives:
+          "State functions of an OS; Manage files and folders; Use the control panel.",
+        status: "APPROVED",
+        createdById: omkar.id,
+      },
+    });
+    await db.unit.create({
+      data: {
+        gradeId: grades[8].id,
+        subjectId: csSubject.id,
+        academicYearId: ay.id,
+        term: "Term 1",
+        unitName: "Word Processing (MS Word)",
+        topics:
+          "Introduction to word processing; Creating, saving, opening documents; Formatting text; Tables and images; Page layout and printing.",
+        status: "DRAFT",
+        createdById: omkar.id,
+      },
+    });
+  }
+  console.log("✓ Sample syllabus units (draft/submitted/approved)");
+
+  // Welcome notification
+  await db.notification.create({
+    data: {
+      senderId: principal.id,
+      targetRoleId: roles[ROLES.TEACHER].id,
+      title: "Welcome to SMS 2025-26",
+      message:
+        "Dear teachers, please complete and submit your syllabus details for Term 1 by the end of this week. — Principal's Office",
+    },
+  });
+  console.log("✓ Welcome notification");
+
+  console.log("\n=== Seed complete ===");
+  console.log("Login credentials (password for all): sharada123");
+  console.log("  superadmin / principal / coordinator / omkar / lakshmi / ramesh ...");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await db.$disconnect();
+  });
