@@ -14,11 +14,21 @@ const C = {
   muted: "#64748b",
   faint: "#94a3b8",
   line: "#e2e8f0",
-  surface: "#f8fafc",
+  surface: "#f1f5f9",
   primary: "#2563eb",
   primaryDark: "#1e40af",
   white: "#ffffff",
+  amber: "#fefce8",
+  amberText: "#713f12",
+  amberBorder: "#ca8a04",
 };
+
+function splitTopics(raw: string): string[] {
+  return raw
+    .split(/[\n\r]+|,(?=\s)/)
+    .map((t) => t.replace(/^\s*[-•·*\d.)\]]+\s*/, "").trim())
+    .filter((t) => t.length > 0);
+}
 
 export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
   function CompiledDocView({ doc }, ref) {
@@ -28,89 +38,92 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
         className="print-area mx-auto w-full max-w-4xl rounded-2xl p-8 shadow-sm sm:p-12"
         style={{ background: C.white, border: `1px solid ${C.line}` }}
       >
-        {/* Letterhead */}
+        {/* Header image — centered, top margin */}
+        <div style={{ textAlign: "center" }}>
+          <img
+            src="/school-header.png"
+            alt="Sharada Public School"
+            style={{
+              display: "block",
+              margin: "0 auto",
+              height: "auto",
+              maxHeight: 90,
+              maxWidth: "100%",
+              objectFit: "contain",
+            }}
+          />
+        </div>
+        {/* Line after header */}
+        <div
+          style={{
+            margin: "14px 0 10px",
+            height: 2,
+            background: C.primary,
+            borderRadius: 1,
+          }}
+        />
+        {/* Meta row */}
         <div
           style={{
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            gap: "16px",
-            paddingBottom: "20px",
-            borderBottom: `2px solid ${C.primary}`,
+            marginBottom: 20,
           }}
         >
-          <div
+          <span
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 12,
-              background: C.primary,
-              color: C.white,
-              display: "grid",
-              placeItems: "center",
-              boxShadow: "0 4px 10px rgba(37,99,235,0.25)",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#475569",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
             }}
           >
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-              <path d="M6 12v5c3 3 9 3 12 0v-5" />
-            </svg>
-          </div>
-          <div style={{ flex: 1 }}>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 24,
-                fontWeight: 700,
-                color: C.ink,
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {doc.school.name}
-            </h1>
-            <p style={{ margin: "2px 0 0", fontSize: 13, color: C.inkSoft }}>
-              {doc.school.city} — {doc.school.pin} · Karnataka, India
-            </p>
-          </div>
-          <div style={{ textAlign: "right", fontSize: 12, color: C.muted }}>
-            <p style={{ margin: 0, fontWeight: 600, color: C.inkSoft }}>
-              Academic Year
-            </p>
-            <p style={{ margin: 0 }}>{doc.academicYear}</p>
-          </div>
+            Academic Year {doc.academicYear}
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#475569",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            {doc.term}
+          </span>
         </div>
-
-        {/* Title */}
-        <div style={{ margin: "24px 0", textAlign: "center" }}>
+        {/* Grade title */}
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
           <h2
             style={{
               margin: 0,
-              fontSize: 20,
-              fontWeight: 700,
+              fontSize: 22,
+              fontWeight: 800,
               color: C.ink,
+              letterSpacing: "-0.01em",
             }}
           >
             {doc.grade.displayName} — Annual Syllabus
           </h2>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: C.muted }}>
-            {doc.term} · Compiled for parent reference
-          </p>
+          <div
+            style={{
+              margin: "8px auto 0",
+              width: 60,
+              height: 3,
+              background: C.primary,
+              borderRadius: 2,
+            }}
+          />
         </div>
 
         {doc.subjects.length === 0 ? (
           <div
             style={{
-              borderRadius: 12,
-              border: `1px dashed ${C.line}`,
-              padding: "40px 16px",
+              borderRadius: 10,
+              border: `1px dashed #cbd5e1`,
+              padding: "36px 16px",
               textAlign: "center",
               fontSize: 13,
               color: C.muted,
@@ -119,203 +132,275 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
             No approved syllabus entries have been compiled for this grade yet.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-            {doc.subjects.map((s) => {
-              const totalUnits = s.terms.reduce(
-                (acc, t) => acc + t.units.length,
-                0
-              );
-              return (
-                <section key={s.subject.id} style={{ breakInside: "avoid" }}>
-                  <div
+          <div>
+            {doc.subjects.map((s) => (
+              <section
+                key={s.subject.id}
+                style={{ breakInside: "avoid", marginBottom: 24 }}
+              >
+                {/* Subject header bar */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 12,
+                    padding: "8px 14px",
+                    background: "linear-gradient(90deg,#eff6ff 0%,#f8fafc 100%)",
+                    borderRadius: 8,
+                    borderLeft: `4px solid ${C.primary}`,
+                  }}
+                >
+                  <h3
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 12,
+                      margin: 0,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: C.ink,
                     }}
                   >
-                    <h3
-                      style={{
-                        margin: 0,
-                        fontSize: 17,
-                        fontWeight: 600,
-                        color: C.ink,
-                      }}
-                    >
-                      {s.subject.name}
-                    </h3>
+                    {s.subject.name}
+                  </h3>
+                  <span
+                    style={{
+                      borderRadius: 5,
+                      background: C.primary,
+                      color: C.white,
+                      padding: "2px 7px",
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {s.subject.code}
+                  </span>
+                  {s.teacherName !== "—" && (
                     <span
                       style={{
-                        borderRadius: 6,
-                        background: "#eff6ff",
-                        padding: "2px 8px",
+                        marginLeft: "auto",
                         fontSize: 11,
-                        fontWeight: 500,
-                        color: C.primaryDark,
+                        color: C.muted,
                       }}
                     >
-                      {s.subject.code}
+                      Faculty: {s.teacherName}
                     </span>
-                    {s.teacherName !== "—" && (
+                  )}
+                </div>
+
+                {s.terms.map((t) => (
+                  <div
+                    key={t.term}
+                    style={{ marginBottom: 18, breakInside: "avoid" }}
+                  >
+                    {/* Term label */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                        padding: "5px 0",
+                        borderBottom: `2px solid ${C.primary}`,
+                        width: "fit-content",
+                      }}
+                    >
                       <span
                         style={{
-                          marginLeft: "auto",
-                          fontSize: 12,
-                          color: C.muted,
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          background: C.primary,
                         }}
-                      >
-                        Faculty: {s.teacherName}
-                      </span>
-                    )}
-                  </div>
-
-                  {s.terms.map((t) => (
-                    <div key={t.term} style={{ marginBottom: 16, breakInside: "avoid" }}>
-                      <h4
+                      />
+                      <span
                         style={{
-                          margin: "0 0 8px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          fontSize: 13,
-                          fontWeight: 600,
+                          fontSize: 12,
+                          fontWeight: 700,
                           textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          letterSpacing: "0.08em",
                           color: C.primaryDark,
                         }}
                       >
-                        <span
-                          style={{
-                            display: "inline-block",
-                            width: 8,
-                            height: 8,
-                            borderRadius: 999,
-                            background: C.primary,
-                          }}
-                        />
                         {t.term}
-                      </h4>
-                      {t.units.length === 0 ? (
-                        <p
-                          style={{
-                            margin: "0 0 0 16px",
-                            fontSize: 12,
-                            fontStyle: "italic",
-                            color: C.faint,
-                          }}
-                        >
-                          No units published for this term.
-                        </p>
-                      ) : (
-                        <ol
-                          style={{
-                            margin: 0,
-                            paddingLeft: 16,
-                            listStyle: "none",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 12,
-                          }}
-                        >
-                          {t.units.map((u, i) => (
-                            <li
-                              key={u.id}
+                      </span>
+                    </div>
+
+                    {t.units.length === 0 ? (
+                      <p
+                        style={{
+                          margin: 0,
+                          padding: "8px 14px",
+                          fontSize: 12,
+                          fontStyle: "italic",
+                          color: C.faint,
+                        }}
+                      >
+                        No units published for this term.
+                      </p>
+                    ) : (
+                      t.units.map((u, i) => {
+                        const topics = splitTopics(u.topics);
+                        return (
+                          <div
+                            key={u.id}
+                            style={{
+                              breakInside: "avoid",
+                              marginBottom: 14,
+                              border: `1px solid ${C.line}`,
+                              borderRadius: 8,
+                              overflow: "hidden",
+                            }}
+                          >
+                            {/* Unit header */}
+                            <div
                               style={{
-                                breakInside: "avoid",
-                                borderRadius: 8,
-                                border: `1px solid ${C.line}`,
-                                background: C.surface,
-                                padding: 12,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                padding: "9px 12px",
+                                background: "#eff6ff",
+                                borderBottom: `1px solid ${C.line}`,
                               }}
                             >
-                              <div
+                              <span
                                 style={{
-                                  display: "flex",
-                                  alignItems: "baseline",
-                                  gap: 8,
+                                  display: "inline-grid",
+                                  placeItems: "center",
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: 6,
+                                  background: C.primary,
+                                  color: C.white,
+                                  fontSize: 11,
+                                  fontWeight: 700,
                                 }}
                               >
-                                <span
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    color: C.primaryDark,
-                                  }}
-                                >
-                                  {i + 1}.
-                                </span>
-                                <span
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    color: C.ink,
-                                  }}
-                                >
-                                  {u.unitName}
-                                </span>
-                              </div>
-                              <div
+                                {i + 1}
+                              </span>
+                              <span
                                 style={{
-                                  marginTop: 4,
-                                  marginLeft: 20,
-                                  fontSize: 12,
-                                  lineHeight: 1.6,
-                                  color: C.inkSoft,
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: C.ink,
                                 }}
                               >
-                                <p style={{ margin: "0 0 4px" }}>
-                                  <span
-                                    style={{ fontWeight: 600, color: C.ink }}
+                                {u.unitName}
+                              </span>
+                            </div>
+                            {/* Unit body */}
+                            <div style={{ padding: "10px 12px" }}>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: C.muted,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                }}
+                              >
+                                Topics
+                              </span>
+                              <div style={{ marginTop: 8 }}>
+                                {topics.map((tp, ti) => (
+                                  <div
+                                    key={ti}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      gap: 8,
+                                      padding: "6px 10px",
+                                      marginBottom: 3,
+                                      background: C.surface,
+                                      borderRadius: 5,
+                                      borderLeft: `3px solid ${C.primary}`,
+                                    }}
                                   >
-                                    Topics:{" "}
-                                  </span>
-                                  {u.topics}
-                                </p>
-                                {u.learningObjectives && (
-                                  <p style={{ margin: 0 }}>
                                     <span
-                                      style={{ fontWeight: 600, color: C.ink }}
+                                      style={{
+                                        flex: "0 0 auto",
+                                        minWidth: 18,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: C.primary,
+                                        textAlign: "right",
+                                      }}
                                     >
-                                      Objectives:{" "}
+                                      {ti + 1}
                                     </span>
+                                    <span
+                                      style={{
+                                        flex: 1,
+                                        fontSize: 12,
+                                        lineHeight: 1.5,
+                                        color: C.inkSoft,
+                                      }}
+                                    >
+                                      {tp}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              {u.learningObjectives && (
+                                <div
+                                  style={{
+                                    marginTop: 8,
+                                    padding: "7px 10px",
+                                    background: C.amber,
+                                    borderRadius: 5,
+                                    borderLeft: `3px solid ${C.amberBorder}`,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      color: "#854d0e",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.04em",
+                                    }}
+                                  >
+                                    Objectives
+                                  </span>
+                                  <p
+                                    style={{
+                                      margin: "3px 0 0",
+                                      fontSize: 11.5,
+                                      lineHeight: 1.5,
+                                      color: C.amberText,
+                                    }}
+                                  >
                                     {u.learningObjectives}
                                   </p>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                    </div>
-                  ))}
-                  {totalUnits === 0 && (
-                    <p style={{ fontSize: 12, fontStyle: "italic", color: C.faint }}>
-                      No approved units.
-                    </p>
-                  )}
-                </section>
-              );
-            })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ))}
+              </section>
+            ))}
           </div>
         )}
 
         {/* Footer note */}
         <div
           style={{
-            marginTop: 40,
+            marginTop: 30,
+            paddingTop: 14,
             borderTop: `1px solid ${C.line}`,
-            paddingTop: 16,
             textAlign: "center",
           }}
         >
-          <p style={{ margin: 0, fontSize: 11, color: C.faint }}>
+          <p style={{ margin: 0, fontSize: 10, color: C.faint }}>
             This compiled syllabus is auto-generated by the SMS portal of{" "}
             {doc.school.name}, {doc.school.city} {doc.school.pin}.
           </p>
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: C.faint }}>
-            Architected &amp; Developed by Omkar RG | Dept. of CS, Sharada Public
-            School
+          <p style={{ margin: "3px 0 0", fontSize: 10, color: C.faint }}>
+            © {new Date().getFullYear()} · Architected &amp; Developed by Omkar RG |
+            Dept. of CS, Sharada Public School
           </p>
         </div>
       </div>

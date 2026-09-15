@@ -166,41 +166,100 @@ export function CoordinatorDashboard({ user: _user }: Props) {
   }
 
   // ---- Export helpers ----
-  function buildCompiledHtml(doc: CompiledDoc): string {
+  function splitTopics(raw: string): string[] {
+    return raw
+      .split(/[\n\r]+|,(?=\s)/)
+      .map((t) => t.replace(/^\s*[-•·*\d.)\]]+\s*/, "").trim())
+      .filter((t) => t.length > 0);
+  }
+
+  function buildCompiledHtml(doc: CompiledDoc, headerImage = ""): string {
+    const headerImgTag = headerImage
+      ? `<img src="${headerImage}" style="display:block;margin:0 auto 0;height:auto;max-height:90px;max-width:100%;object-fit:contain;" />`
+      : "";
+
     const subjects = doc.subjects
       .map((s) => {
         const terms = s.terms
           .map((t) => {
             const units =
               t.units.length === 0
-                ? `<p style="margin:0 0 0 16px;font-size:12px;font-style:italic;color:#94a3b8;">No units published for this term.</p>`
-                : `<ol style="margin:0;padding-left:16px;list-style:none;display:flex;flex-direction:column;gap:12px;">${t.units
-                    .map(
-                      (u, i) => `<li style="break-inside:avoid;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;padding:12px;">
-                      <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-size:13px;font-weight:700;color:#1e40af;">${i + 1}.</span><span style="font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(u.unitName)}</span></div>
-                      <div style="margin-top:4px;margin-left:20px;font-size:12px;line-height:1.6;color:#334155;">
-                        <p style="margin:0 0 4px;"><span style="font-weight:600;color:#0f172a;">Topics: </span>${escapeHtml(u.topics)}</p>
-                        ${u.learningObjectives ? `<p style="margin:0;"><span style="font-weight:600;color:#0f172a;">Objectives: </span>${escapeHtml(u.learningObjectives)}</p>` : ""}
-                      </div></li>`
-                    )
-                    .join("")}</ol>`;
-            return `<div style="margin-bottom:16px;break-inside:avoid;"><h4 style="margin:0 0 8px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#1e40af;"><span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:#2563eb;"></span>${t.term}</h4>${units}</div>`;
+                ? `<p style="margin:0;padding:8px 14px;font-size:12px;font-style:italic;color:#94a3b8;">No units published for this term.</p>`
+                : t.units
+                    .map((u, i) => {
+                      const topicList = splitTopics(u.topics);
+                      const topicsHtml =
+                        topicList.length === 0
+                          ? ""
+                          : `<div style="margin-top:8px;">${topicList
+                              .map(
+                                (tp, ti) => `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;margin-bottom:3px;background:#f1f5f9;border-radius:5px;border-left:3px solid #2563eb;">
+                                <span style="flex:0 0 auto;min-width:18px;font-size:11px;font-weight:700;color:#2563eb;text-align:right;">${ti + 1}</span>
+                                <span style="flex:1;font-size:12px;line-height:1.5;color:#334155;">${escapeHtml(tp)}</span>
+                              </div>`
+                              )
+                              .join("")}</div>`;
+                      const objectivesHtml = u.learningObjectives
+                        ? `<div style="margin-top:8px;padding:7px 10px;background:#fefce8;border-radius:5px;border-left:3px solid #ca8a04;"><span style="font-size:11px;font-weight:700;color:#854d0e;text-transform:uppercase;letter-spacing:0.04em;">Objectives</span><p style="margin:3px 0 0;font-size:11.5px;line-height:1.5;color:#713f12;">${escapeHtml(u.learningObjectives)}</p></div>`
+                        : "";
+                      return `<div style="break-inside:avoid;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#eff6ff;border-bottom:1px solid #e2e8f0;">
+                          <span style="flex:0 0 auto;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;">${i + 1}</span>
+                          <span style="flex:1;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(u.unitName)}</span>
+                        </div>
+                        <div style="padding:10px 12px;">
+                          <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Topics</span>
+                          ${topicsHtml}
+                          ${objectivesHtml}
+                        </div>
+                      </div>`;
+                    })
+                    .join("");
+            return `<div style="margin-bottom:18px;break-inside:avoid;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:5px 0;border-bottom:2px solid #2563eb;width:fit-content;">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:#2563eb;"></span>
+                <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#1e40af;">${t.term}</span>
+              </div>
+              ${units}
+            </div>`;
           })
           .join("");
-        return `<section style="break-inside:avoid;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><h3 style="margin:0;font-size:17px;font-weight:600;color:#0f172a;">${escapeHtml(s.subject.name)}</h3><span style="border-radius:6px;background:#eff6ff;padding:2px 8px;font-size:11px;font-weight:500;color:#1e40af;">${escapeHtml(s.subject.code)}</span>${s.teacherName !== "—" ? `<span style="margin-left:auto;font-size:12px;color:#64748b;">Faculty: ${escapeHtml(s.teacherName)}</span>` : ""}</div>${terms}</section>`;
+        return `<section style="break-inside:avoid;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 14px;background:linear-gradient(90deg,#eff6ff 0%,#f8fafc 100%);border-radius:8px;border-left:4px solid #2563eb;">
+            <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;flex:0 1 auto;">${escapeHtml(s.subject.name)}</h3>
+            <span style="border-radius:5px;background:#2563eb;color:#fff;padding:2px 7px;font-size:10px;font-weight:600;">${escapeHtml(s.subject.code)}</span>
+            ${s.teacherName !== "—" ? `<span style="margin-left:auto;font-size:11px;color:#64748b;">Faculty: ${escapeHtml(s.teacherName)}</span>` : ""}
+          </div>
+          ${terms}
+        </section>`;
       })
       .join("");
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(doc.grade.displayName)} Syllabus</title></head><body style="margin:0;font-family:'Inter','Segoe UI',Arial,sans-serif;color:#0f172a;">
-<div style="max-width:780px;margin:0 auto;padding:40px 48px;">
-<div style="display:flex;align-items:center;gap:16px;padding-bottom:20px;border-bottom:2px solid #2563eb;">
-<div style="width:56px;height:56px;border-radius:12px;background:#2563eb;display:grid;place-items:center;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
-<div style="flex:1;"><h1 style="margin:0;font-size:24px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">${escapeHtml(doc.school.name)}</h1><p style="margin:2px 0 0;font-size:13px;color:#334155;">${escapeHtml(doc.school.city)} — ${escapeHtml(doc.school.pin)} · Karnataka, India</p></div>
-<div style="text-align:right;font-size:12px;color:#64748b;"><p style="margin:0;font-weight:600;color:#334155;">Academic Year</p><p style="margin:0;">${escapeHtml(doc.academicYear)}</p></div>
-</div>
-<div style="margin:24px 0;text-align:center;"><h2 style="margin:0;font-size:20px;font-weight:700;color:#0f172a;">${escapeHtml(doc.grade.displayName)} — Annual Syllabus</h2><p style="margin:4px 0 0;font-size:13px;color:#64748b;">${escapeHtml(doc.term)} · Compiled for parent reference</p></div>
-<div style="display:flex;flex-direction:column;gap:28px;">${subjects || `<div style="border-radius:12px;border:1px dashed #e2e8f0;padding:40px 16px;text-align:center;font-size:13px;color:#64748b;">No approved syllabus entries have been compiled for this grade yet.</div>`}</div>
-<div style="margin-top:40px;border-top:1px solid #e2e8f0;padding-top:16px;text-align:center;"><p style="margin:0;font-size:11px;color:#94a3b8;">This compiled syllabus is auto-generated by the SMS portal of ${escapeHtml(doc.school.name)}, ${escapeHtml(doc.school.city)} ${escapeHtml(doc.school.pin)}.</p><p style="margin:4px 0 0;font-size:11px;color:#94a3b8;">Architected &amp; Developed by Omkar RG | Dept. of CS, Sharada Public School</p></div>
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(doc.grade.displayName)} Syllabus</title></head><body style="margin:0;padding:0;font-family:'Inter','Segoe UI',Arial,sans-serif;color:#0f172a;background:#fff;">
+<div style="max-width:760px;margin:0 auto;padding:36px 44px 28px;">
+  <!-- Header image centered with top margin -->
+  <div style="text:center;margin-bottom:0;">
+    ${headerImgTag}
+  </div>
+  <!-- Line after header -->
+  <div style="margin:14px 0 10px;height:2px;background:#2563eb;border-radius:1px;"></div>
+  <!-- Meta row: academic year left, term right -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <span style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">Academic Year ${escapeHtml(doc.academicYear)}</span>
+    <span style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(doc.term)}</span>
+  </div>
+  <!-- Grade title -->
+  <div style="text-align:center;margin-bottom:24px;">
+    <h2 style="margin:0;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.01em;">${escapeHtml(doc.grade.displayName)} — Annual Syllabus</h2>
+    <div style="margin:8px auto 0;width:60px;height:3px;background:#2563eb;border-radius:2px;"></div>
+  </div>
+  <!-- Subjects -->
+  <div>${subjects || `<div style="border-radius:10px;border:1px dashed #cbd5e1;padding:36px 16px;text-align:center;font-size:13px;color:#64748b;">No approved syllabus entries have been compiled for this grade yet.</div>`}</div>
+  <!-- Footer -->
+  <div style="margin-top:30px;padding-top:14px;border-top:1px solid #e2e8f0;text-align:center;">
+    <p style="margin:0;font-size:10px;color:#94a3b8;">This compiled syllabus is auto-generated by the SMS portal of ${escapeHtml(doc.school.name)}, ${escapeHtml(doc.school.city)} ${escapeHtml(doc.school.pin)}.</p>
+    <p style="margin:3px 0 0;font-size:10px;color:#94a3b8;">© ${new Date().getFullYear()} · Architected &amp; Developed by Omkar RG | Dept. of CS, Sharada Public School</p>
+  </div>
 </div></body></html>`;
   }
 
@@ -216,12 +275,28 @@ export function CoordinatorDashboard({ user: _user }: Props) {
     window.print();
   }
 
+  async function fetchHeaderImage(): Promise<string> {
+    try {
+      const res = await fetch("/school-header.png");
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return "";
+    }
+  }
+
   async function handleExportPdf() {
     if (!compiled) return;
     setExporting(true);
     try {
       const html2pdf = (await import("html2pdf.js")).default;
-      const html = buildCompiledHtml(compiled);
+      const headerImage = await fetchHeaderImage();
+      const html = buildCompiledHtml(compiled, headerImage);
       // Render in an isolated iframe to avoid oklch contamination from the main page
       const iframe = document.createElement("iframe");
       iframe.style.position = "fixed";
@@ -243,6 +318,19 @@ export function CoordinatorDashboard({ user: _user }: Props) {
         ""
       )}_${compiled.academicYear.replace("/", "-")}.pdf`;
       const target = doc.body.firstElementChild as HTMLElement;
+      // Wait for the header image (if any) to finish loading before snapshot
+      const imgs = Array.from(target.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  img.onload = () => resolve();
+                  img.onerror = () => resolve();
+                })
+        )
+      );
       await new Promise<void>((resolve) => {
         // ensure fonts/layout settle
         setTimeout(resolve, 250);
@@ -265,11 +353,12 @@ export function CoordinatorDashboard({ user: _user }: Props) {
     }
   }
 
-  function handleExportDocx() {
+  async function handleExportDocx() {
     if (!compiled) return;
     setExporting(true);
     try {
-      const html = buildCompiledHtml(compiled);
+      const headerImage = await fetchHeaderImage();
+      const html = buildCompiledHtml(compiled, headerImage);
       const wrapped = `<!DOCTYPE html><html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${compiled.grade.displayName} Syllabus</title></head><body>${html.replace(
         /^<!DOCTYPE html>.*?<body[^>]*>/s,
         ""

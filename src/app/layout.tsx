@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Omkar RG, Dept. of CS, Sharada Public School" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/favicon-s.svg",
   },
 };
 

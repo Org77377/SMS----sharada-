@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { GraduationCap, Lock, User, Loader2, BookOpen, CheckCircle2 } from "lucide-react";
+import { Lock, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,61 +44,74 @@ export function LoginView({ onLogin }: { onLogin: (user: AuthUser) => void }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* Top brand bar */}
-      <header className="border-b border-slate-200/60 bg-white/70 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/20">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-bold text-slate-900">SMS</p>
-            <p className="text-xs text-slate-500">
-              Sharada Public School · Vijayapura 586-109
-            </p>
-          </div>
-        </div>
-      </header>
+      <main className="flex flex-1 items-stretch">
+        {/* Left: Aesthetic hero with school name + background overlay */}
+        <motion.section
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="relative hidden flex-1 items-center justify-center overflow-hidden lg:flex"
+        >
+          {/* Background image overlay */}
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
+            style={{ backgroundImage: "url(/school-header.png)" }}
+          />
+          {/* Gradient wash */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/90 via-blue-700/85 to-indigo-800/90" />
+          {/* Subtle radial highlights */}
+          <div className="absolute -left-20 top-1/4 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -right-10 bottom-1/4 h-80 w-80 rounded-full bg-sky-300/15 blur-3xl" />
 
-      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:py-16">
-        <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-2 lg:items-center">
-          {/* Left: hero */}
-          <motion.div
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="hidden flex-col gap-6 lg:flex"
-          >
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                <BookOpen className="h-3.5 w-3.5" /> Syllabus Management System
+          {/* Big school name with layered overlay text */}
+          <div className="relative z-10 px-12 text-center">
+            <motion.h1
+              initial={{ opacity: 0, y: 20, letterSpacing: "0.3em" }}
+              animate={{ opacity: 1, y: 0, letterSpacing: "0em" }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="text-6xl font-black leading-[0.95] tracking-tight text-white drop-shadow-2xl xl:text-7xl"
+            >
+              Sharada
+              <br />
+              <span className="bg-gradient-to-r from-white via-blue-50 to-sky-200 bg-clip-text text-transparent">
+                Public School
               </span>
-              <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight text-slate-900">
-                One place for the entire school&apos;s syllabus.
-              </h1>
-              <p className="mt-3 text-base text-slate-600">
-                Teachers submit, coordinators compile, principals approve — a clean,
-                print-ready syllabus for every grade.
-              </p>
-            </div>
-            <ul className="space-y-3">
-              {[
-                "Role-based dashboards for 108+ staff",
-                "Term-wise syllabus tracking (Grades 4–10)",
-                "Review, approve & return with feedback",
-                "One-click compiled PDF / print-ready output",
-              ].map((f) => (
-                <li key={f} className="flex items-start gap-3 text-sm text-slate-700">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              className="mt-5 text-base font-medium tracking-[0.35em] text-blue-100/80 uppercase"
+            >
+              Vijayapura · 586-109
+            </motion.p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+              className="mt-2 text-sm font-light tracking-widest text-blue-200/70 uppercase"
+            >
+              Syllabus Management System
+            </motion.p>
+          </div>
 
-          {/* Right: login card */}
+          {/* Looping credit animation at bottom */}
+          <div className="absolute bottom-8 left-0 right-0 z-10 text-center">
+            <motion.p
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+              className="text-[11px] font-light tracking-wider text-blue-100/70"
+            >
+              © {new Date().getFullYear()} · Crafted by Omkar RG
+            </motion.p>
+          </div>
+        </motion.section>
+
+        {/* Right: login card */}
+        <div className="flex w-full max-w-md items-center justify-center px-4 py-10 sm:py-16 lg:max-w-lg">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mx-auto w-full max-w-md"
+            className="w-full"
           >
             <Card className="border-slate-200/80 p-6 shadow-xl shadow-slate-200/50 sm:p-8">
               <div className="mb-6 text-center">
@@ -187,6 +200,11 @@ export function LoginView({ onLogin }: { onLogin: (user: AuthUser) => void }) {
                   ))}
                 </div>
               </div>
+
+              {/* Mobile-only credit (hidden on lg where hero shows it) */}
+              <p className="mt-6 text-center text-[11px] font-light text-slate-400 lg:hidden">
+                © {new Date().getFullYear()} · Crafted by Omkar RG
+              </p>
             </Card>
           </motion.div>
         </div>
