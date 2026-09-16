@@ -52,13 +52,6 @@ export default function Home() {
     bootstrap();
   }, [bootstrap]);
 
-  // Poll notifications every 30s when logged in
-  useEffect(() => {
-    if (!user) return;
-    const t = setInterval(loadNotifications, 30000);
-    return () => clearInterval(t);
-  }, [user, loadNotifications]);
-
   async function handleLogin(u: AuthUser) {
     setUser(u);
     setBootstrapping(false);
@@ -151,7 +144,11 @@ export default function Home() {
     <AppShell
       user={user}
       unreadCount={unreadCount}
-      onOpenNotifications={() => setNotifOpen(true)}
+      onOpenNotifications={() => {
+        setNotifOpen(true);
+        // User-initiated refresh — no auto-polling
+        loadNotifications();
+      }}
       onLogout={handleLogout}
       rightSlot={rightSlot}
     >
