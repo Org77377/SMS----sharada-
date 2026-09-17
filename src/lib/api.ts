@@ -188,6 +188,24 @@ export const api = {
       request<{ removed: number; message?: string }>(`/api/admin/users/clear-teachers`, {
         method: "DELETE",
       }),
+    bulkCreateUsers: (csv: string) =>
+      request<{
+        created: number;
+        skipped: number;
+        errors: number;
+        total: number;
+        results: {
+          row: number;
+          name: string;
+          username: string;
+          role: string;
+          status: "created" | "skipped" | "error";
+          message?: string;
+        }[];
+      }>("/api/admin/users/bulk", {
+        method: "POST",
+        body: JSON.stringify({ csv }),
+      }),
     assignments: () =>
       request<{
         assignments: (Assignment & { teacher: { name: string; username: string } })[];

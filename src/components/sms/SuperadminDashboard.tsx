@@ -16,10 +16,12 @@ import {
   Search,
   ShieldCheck,
   Trash2,
+  Upload,
   UserCog,
   Users,
   Wand2,
   Building2,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -108,6 +110,17 @@ export function SuperadminDashboard({ user }: Props) {
   // Clear all teachers
   const [showClearTeachers, setShowClearTeachers] = useState(false);
   const [clearingTeachers, setClearingTeachers] = useState(false);
+  // CSV bulk import
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    created: number;
+    skipped: number;
+    errors: number;
+    total: number;
+    results: { row: number; name: string; username: string; role: string; status: string; message?: string }[];
+  } | null>(null);
 
   // Assignments
   const [assignments, setAssignments] = useState<
@@ -361,6 +374,64 @@ export function SuperadminDashboard({ user }: Props) {
     } finally {
       setClearingTeachers(false);
     }
+  }
+
+  function downloadCsvTemplate() {
+    const template = `name,username,password,role,department,active
+Ravi Kumar,ravi,ravi123,Teacher,,true
+Sneha Patil,sneha,sneha123,HOD,Languages,true
+Amit Shah,amit,amit123,Exam Coordinator,,true`;
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sms-users-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function onCsvFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCsvText(String(reader.result || ""));
+      setImportResult(null);
+    };
+    reader.readAsText(file);
+    // reset input value so selecting the same file again re-triggers
+    e.target.value = "";
+  }
+
+  async function runImport() {
+    if (!csvText.trim()) {
+      toast.error("Paste CSV text or upload a CSV file first");
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await api.admin.bulkCreateUsers(csvText);
+      setImportResult(res);
+      if (res.created > 0) {
+        toast.success(`Imported ${res.created} user${res.created === 1 ? "" : "s"}`);
+        loadUsers();
+      } else {
+        toast.info("No new users created (all skipped or errored)");
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function resetImportDialog() {
+    setShowImportDialog(false);
+    setCsvText("");
+    setImportResult(null);
   }
 
   // ---- Assignments ----
@@ -626,6 +697,14 @@ export function SuperadminDashboard({ user }: Props) {
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={loadUsers} disabled={loadingUsers}>
                 <RefreshCw className={`h-4 w-4 ${loadingUsers ? "animate-spin" : ""}`} />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowImportDialog(true)}
+                title="Import users from CSV"
+              >
+                <Upload className="mr-1 h-4 w-4" /> Import CSV
               </Button>
               <Button
                 size="sm"
@@ -1483,6 +1562,111 @@ export function SuperadminDashboard({ user }: Props) {
                 <Trash2 className="mr-1 h-4 w-4" />
               )}
               Clear Teachers
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV bulk import */}
+      <Dialog open={showImportDialog} onOpenChange={(o) => { if (!o) resetImportDialog(); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bulk import users from CSV</DialogTitle>
+            <DialogDescription>
+              Upload or paste a CSV with one user per row. Required columns:
+              <span className="font-semibold"> name, username, password, role</span>.
+              Optional: <span className="font-semibold">department, active</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {/* Template download + file upload */}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate}>
+                <Download className="mr-1 h-3.5 w-3.5" /> Download template
+              </Button>
+              <label>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={onCsvFileSelected}
+                />
+                <span className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                  <Upload className="h-3.5 w-3.5" /> Upload CSV file
+                </span>
+              </label>
+            </div>
+
+            {/* CSV textarea */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">CSV content</Label>
+              <textarea
+                className="sms-scroll h-40 w-full rounded-md border border-slate-200 p-3 font-mono text-xs"
+                placeholder={"name,username,password,role,department,active\nRavi Kumar,ravi,ravi123,Teacher,,true"}
+                value={csvText}
+                onChange={(e) => { setCsvText(e.target.value); setImportResult(null); }}
+              />
+            </div>
+
+            {/* Column help */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+              <p className="mb-1 font-semibold text-slate-700">Column guide</p>
+              <ul className="space-y-0.5">
+                <li><b>name</b> — Full name (e.g. "Ravi Kumar")</li>
+                <li><b>username</b> — unique login id (e.g. "ravi")</li>
+                <li><b>password</b> — initial password (e.g. "ravi123")</li>
+                <li><b>role</b> — one of: Teacher, HOD, Exam Coordinator, Principal, Superadmin</li>
+                <li><b>department</b> — required only for HOD (must match an existing department name)</li>
+                <li><b>active</b> — true / false (optional, defaults to true)</li>
+              </ul>
+            </div>
+
+            {/* Result summary */}
+            {importResult && (
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="mb-2 flex flex-wrap gap-3 text-xs">
+                  <span className="font-semibold text-emerald-700">✓ Created: {importResult.created}</span>
+                  <span className="font-semibold text-amber-700">⊘ Skipped: {importResult.skipped}</span>
+                  <span className="font-semibold text-rose-700">✗ Errors: {importResult.errors}</span>
+                  <span className="text-slate-500">Total: {importResult.total}</span>
+                </div>
+                <div className="sms-scroll max-h-40 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
+                        <th className="py-1 pr-2">#</th>
+                        <th className="py-1 pr-2">Name</th>
+                        <th className="py-1 pr-2">Username</th>
+                        <th className="py-1 pr-2">Status</th>
+                        <th className="py-1">Message</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importResult.results.map((r) => (
+                        <tr key={r.row} className="border-b border-slate-50">
+                          <td className="py-1 pr-2 text-slate-400">{r.row}</td>
+                          <td className="py-1 pr-2 text-slate-700">{r.name}</td>
+                          <td className="py-1 pr-2 text-slate-500">@{r.username}</td>
+                          <td className={`py-1 pr-2 font-medium ${
+                            r.status === "created" ? "text-emerald-700" :
+                            r.status === "skipped" ? "text-amber-700" : "text-rose-700"
+                          }`}>{r.status}</td>
+                          <td className="py-1 text-slate-500">{r.message || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetImportDialog}>
+              Close
+            </Button>
+            <Button onClick={runImport} disabled={importing || !csvText.trim()} className="bg-blue-600 hover:bg-blue-700">
+              {importing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />}
+              Import {csvText ? `(${csvText.split(/\r?\n/).filter(l => l.trim() && !l.toLowerCase().startsWith("name,")).length} rows)` : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
