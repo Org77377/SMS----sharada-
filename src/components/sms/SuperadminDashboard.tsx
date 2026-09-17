@@ -950,7 +950,7 @@ export function SuperadminDashboard({ user }: Props) {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50/70">
-                    <TableHead className="text-xs uppercase text-slate-500">Teacher</TableHead>
+                    <TableHead className="text-xs uppercase text-slate-500">Staff Member</TableHead>
                     <TableHead className="text-xs uppercase text-slate-500">Grade</TableHead>
                     <TableHead className="text-xs uppercase text-slate-500">Subject</TableHead>
                     <TableHead className="text-right text-xs uppercase text-slate-500">Actions</TableHead>
@@ -1253,26 +1253,35 @@ export function SuperadminDashboard({ user }: Props) {
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New teacher assignment</DialogTitle>
+            <DialogTitle>New subject assignment</DialogTitle>
             <DialogDescription>
-              Assign a teacher to a grade + subject for an academic year.
+              Assign a staff member (Teacher / HOD / Exam Coordinator / Principal)
+              to a grade + subject for an academic year. Once assigned, they can
+              submit syllabus entries for that combination.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Teacher</Label>
+              <Label className="text-xs">Staff member (Teacher / HOD / Exam Coordinator / Principal)</Label>
               <Select value={aTeacher} onValueChange={setATeacher}>
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select teacher" />
+                  <SelectValue placeholder="Select staff member" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.filter((u) => u.role === "Teacher").map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name} (@{u.username})
-                    </SelectItem>
-                  ))}
+                  {users
+                    .filter((u) =>
+                      ["Teacher", "HOD", "Exam Coordinator", "Principal"].includes(u.role)
+                    )
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name} (@{u.username}) · {u.role}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-slate-400">
+                Any staff member assigned here can submit syllabus for that grade &amp; subject.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Grade</Label>
