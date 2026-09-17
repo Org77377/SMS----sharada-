@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SMS — Sharada Public School, Vijayapura 586-109",
   description:
-    "Syllabus Management System for Sharada Public School, Vijayapura (586-109). Teachers submit syllabus, Coordinators/Principals review & approve, Superadmins manage the system.",
+    "Syllabus Management System for Sharada Public School, Vijayapura (586-109). Teachers submit syllabus, HODs/Coordinators/Principals review & approve, Superadmins manage the system.",
   keywords: [
     "Sharada Public School",
     "Vijayapura",

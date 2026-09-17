@@ -90,16 +90,28 @@ async function main() {
 
   const coordinator = await db.user.upsert({
     where: { username: "coordinator" },
-    update: {},
+    update: { name: "Mahadev Desai", roleId: roles[ROLES.HOD].id },
     create: {
       name: "Mahadev Desai",
       username: "coordinator",
       passwordHash: defaultPassword,
-      roleId: roles[ROLES.COORDINATOR].id,
+      roleId: roles[ROLES.HOD].id,
       active: true,
     },
   });
-  console.log("✓ Admin / Principal / Coordinator users");
+  // Exam Coordinator — same permissions as HOD
+  await db.user.upsert({
+    where: { username: "examcoord" },
+    update: { name: "Suresh Pujari", roleId: roles[ROLES.EXAM_COORDINATOR].id },
+    create: {
+      name: "Suresh Pujari",
+      username: "examcoord",
+      passwordHash: defaultPassword,
+      roleId: roles[ROLES.EXAM_COORDINATOR].id,
+      active: true,
+    },
+  });
+  console.log("✓ Admin / Principal / HOD / Exam Coordinator users");
 
   // Teachers with assignments. password: sharada123 for all.
   const teachers = [
@@ -230,7 +242,7 @@ async function main() {
 
   console.log("\n=== Seed complete ===");
   console.log("Login credentials (password for all): sharada123");
-  console.log("  superadmin / principal / coordinator / omkar / lakshmi / ramesh ...");
+  console.log("  superadmin / principal / coordinator / examcoord / omkar / lakshmi / ramesh ...");
 }
 
 main()

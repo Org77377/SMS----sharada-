@@ -236,8 +236,8 @@ export function TeacherDashboard({ user }: Props) {
           )}
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          Submit your term-wise syllabus for review. Coordinators will compile the
-          final grade document.
+          Submit your term-wise syllabus for review. HODs and coordinators will
+          compile the final grade document.
         </p>
       </motion.div>
 

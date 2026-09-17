@@ -39,6 +39,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
   api,
@@ -72,6 +73,7 @@ export function CoordinatorDashboard({ user: _user }: Props) {
   const [approving, setApproving] = useState(false);
 
   // ---- Compile ----
+  const [allGrades, setAllGrades] = useState<{ id: string; gradeNumber: number; displayName: string }[]>([]);
   const [compileGrade, setCompileGrade] = useState<number>(4);
   const [compileTerm, setCompileTerm] = useState<string>("all");
   const [compiled, setCompiled] = useState<CompiledDoc | null>(null);
@@ -127,6 +129,13 @@ export function CoordinatorDashboard({ user: _user }: Props) {
 
   useEffect(() => {
     loadGrid();
+    // Load grades dynamically (configurable — may not always be 4-10)
+    api.grades().then(({ grades }) => {
+      setAllGrades(grades);
+      if (grades.length > 0 && !grades.find((g) => g.gradeNumber === compileGrade)) {
+        setCompileGrade(grades[0].gradeNumber);
+      }
+    }).catch(() => {});
   }, [loadGrid]);
 
   useEffect(() => {
@@ -439,25 +448,26 @@ export function CoordinatorDashboard({ user: _user }: Props) {
         className="mb-6"
       >
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Coordinator Dashboard
+          Review Dashboard
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {academicYear ? `Academic Year ${academicYear} · ` : ""}Track, review and
-          compile syllabus across Grades 4–10.
+          compile syllabus across all grades.
         </p>
       </motion.div>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-5">
-        <TabsList className="bg-slate-100/80 p-1">
-          <TabsTrigger value="overview" className="gap-1.5">
-            <LayoutGrid className="h-4 w-4" /> Overview
-          </TabsTrigger>
-          <TabsTrigger value="review" className="gap-1.5 relative">
-            <ClipboardList className="h-4 w-4" /> Review
-            {submittedUnits.length > 0 && (
-              <span className="ml-1 grid h-4 min-w-4 place-items-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-                {submittedUnits.length}
-              </span>
+        <ScrollArea className="w-full whitespace-nowrap sms-scroll">
+          <TabsList className="bg-slate-100/80 p-1 inline-flex">
+            <TabsTrigger value="overview" className="gap-1.5">
+              <LayoutGrid className="h-4 w-4" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="review" className="gap-1.5 relative">
+              <ClipboardList className="h-4 w-4" /> Review
+              {submittedUnits.length > 0 && (
+                <span className="ml-1 grid h-4 min-w-4 place-items-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  {submittedUnits.length}
+                </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="compile" className="gap-1.5">
@@ -467,6 +477,7 @@ export function CoordinatorDashboard({ user: _user }: Props) {
             <Megaphone className="h-4 w-4" /> Broadcast
           </TabsTrigger>
         </TabsList>
+        </ScrollArea>
 
         {/* OVERVIEW */}
         <TabsContent value="overview" className="space-y-5">
@@ -683,20 +694,20 @@ export function CoordinatorDashboard({ user: _user }: Props) {
         {/* COMPILE & EXPORT */}
         <TabsContent value="compile" className="space-y-4">
           <Card className="border-slate-200/70 p-4 sms-dashboard-controls">
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-600">Grade</Label>
                 <Select
                   value={String(compileGrade)}
                   onValueChange={(v) => setCompileGrade(Number(v))}
                 >
-                  <SelectTrigger className="h-9 w-36">
+                  <SelectTrigger className="h-9 w-full sm:w-36">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[4, 5, 6, 7, 8, 9, 10].map((g) => (
-                      <SelectItem key={g} value={String(g)}>
-                        Grade {g}
+                    {allGrades.map((g) => (
+                      <SelectItem key={g.id} value={String(g.gradeNumber)}>
+                        {g.displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -705,7 +716,7 @@ export function CoordinatorDashboard({ user: _user }: Props) {
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-600">Term</Label>
                 <Select value={compileTerm} onValueChange={setCompileTerm}>
-                  <SelectTrigger className="h-9 w-36">
+                  <SelectTrigger className="h-9 w-full sm:w-36">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -715,7 +726,7 @@ export function CoordinatorDashboard({ user: _user }: Props) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="ml-auto flex flex-wrap gap-2">
+              <div className="ml-auto flex flex-wrap gap-2 sm:ml-auto">
                 <Button
                   variant="outline"
                   size="sm"
@@ -789,7 +800,8 @@ export function CoordinatorDashboard({ user: _user }: Props) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Teacher">All Teachers</SelectItem>
-                      <SelectItem value="Coordinator">All Coordinators</SelectItem>
+                      <SelectItem value="HOD">All HODs</SelectItem>
+                      <SelectItem value="Exam Coordinator">All Exam Coordinators</SelectItem>
                       <SelectItem value="Principal">Principal</SelectItem>
                     </SelectContent>
                   </Select>

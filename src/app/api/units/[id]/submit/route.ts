@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole } from "@/lib/session";
-import { UNIT_STATUS, ROLES } from "@/lib/auth";
+import { UNIT_STATUS, ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 export async function POST(
   _req: NextRequest,
@@ -29,7 +29,7 @@ export async function POST(
   });
   // Notify coordinators & principal
   const reviewers = await db.user.findMany({
-    where: { role: { name: { in: [ROLES.COORDINATOR, ROLES.PRINCIPAL] } }, active: true },
+    where: { role: { name: { in: [...REVIEWER_ROLES, ROLES.PRINCIPAL] } }, active: true },
   });
   if (reviewers.length > 0) {
     await db.notification.createMany({

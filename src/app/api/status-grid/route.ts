@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { ROLES } from "@/lib/auth";
+import { ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 // Returns a matrix of grade × subject with status counts + term breakdown.
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const check = requireRole(
     session.payload,
-    ROLES.COORDINATOR,
+    ...REVIEWER_ROLES,
     ROLES.PRINCIPAL,
     ROLES.SUPERADMIN
   );

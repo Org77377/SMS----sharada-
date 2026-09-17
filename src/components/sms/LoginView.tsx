@@ -12,7 +12,7 @@ import { api, type AuthUser } from "@/lib/api";
 const DEMO_ACCOUNTS = [
   { role: "Superadmin", username: "superadmin", desc: "Full system control" },
   { role: "Principal", username: "principal", desc: "Review & broadcast" },
-  { role: "Coordinator", username: "coordinator", desc: "Compile & approve" },
+  { role: "HOD", username: "coordinator", desc: "Compile & approve" },
   { role: "Teacher", username: "omkar", desc: "Submit syllabus" },
 ];
 

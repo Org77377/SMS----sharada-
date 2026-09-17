@@ -27,7 +27,8 @@ interface AppShellProps {
 const ROLE_BADGE: Record<Role, string> = {
   Superadmin: "bg-violet-100 text-violet-700",
   Principal: "bg-blue-100 text-blue-700",
-  Coordinator: "bg-cyan-100 text-cyan-700",
+  HOD: "bg-cyan-100 text-cyan-700",
+  "Exam Coordinator": "bg-teal-100 text-teal-700",
   Teacher: "bg-emerald-100 text-emerald-700",
 };
 

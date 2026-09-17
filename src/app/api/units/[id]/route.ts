@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { UNIT_STATUS, ROLES } from "@/lib/auth";
+import { UNIT_STATUS, ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 export async function PATCH(
   req: NextRequest,
@@ -41,8 +41,8 @@ export async function PATCH(
     return NextResponse.json({ unit: updated });
   }
 
-  // Coordinator / Principal / Superadmin: can set status + feedback
-  if (role === ROLES.COORDINATOR || role === ROLES.PRINCIPAL || role === ROLES.SUPERADMIN) {
+  // HOD / Exam Coordinator / Principal / Superadmin: can set status + feedback
+  if (REVIEWER_ROLES.includes(role as typeof REVIEWER_ROLES[number]) || role === ROLES.PRINCIPAL || role === ROLES.SUPERADMIN) {
     const data: Record<string, unknown> = {};
     if (body.status) data.status = body.status;
     if (body.feedback !== undefined) data.feedback = body.feedback ? String(body.feedback).trim() : null;
@@ -95,7 +95,7 @@ export async function DELETE(
     if (unit.status === UNIT_STATUS.APPROVED)
       return NextResponse.json({ error: "Approved units cannot be deleted" }, { status: 400 });
   } else {
-    const check = requireRole(session.payload, ROLES.COORDINATOR, ROLES.PRINCIPAL, ROLES.SUPERADMIN);
+    const check = requireRole(session.payload, ...REVIEWER_ROLES, ROLES.PRINCIPAL, ROLES.SUPERADMIN);
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   }
   await db.unit.delete({ where: { id } });

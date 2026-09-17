@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { UNIT_STATUS, ROLES } from "@/lib/auth";
+import { UNIT_STATUS, ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 export async function POST(
   _req: NextRequest,
@@ -9,7 +9,7 @@ export async function POST(
 ) {
   const session = await getCurrentUserWithRole();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const check = requireRole(session.payload, ROLES.COORDINATOR, ROLES.PRINCIPAL, ROLES.SUPERADMIN);
+  const check = requireRole(session.payload, ...REVIEWER_ROLES, ROLES.PRINCIPAL, ROLES.SUPERADMIN);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   const { id } = await params;
   const unit = await db.unit.findUnique({

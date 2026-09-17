@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { ROLES } from "@/lib/auth";
+import { ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUserWithRole();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const check = requireRole(session.payload, ROLES.PRINCIPAL, ROLES.COORDINATOR, ROLES.SUPERADMIN);
+  const check = requireRole(session.payload, ROLES.PRINCIPAL, ...REVIEWER_ROLES, ROLES.SUPERADMIN);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 
   const body = await req.json();
@@ -25,18 +25,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ notification: n }, { status: 201 });
   }
 
-  // Broadcast to a role (default: teachers)
-  const role = await db.role.findFirst({
-    where: { name: targetRoleId === "all" ? undefined : { equals: targetRoleId } },
+  // Broadcast to a role by name (Teacher, HOD, Exam Coordinator, Principal)
+  const targetRoleRecord = await db.role.findUnique({
+    where: { name: targetRoleId || "Teacher" },
   });
-  let targetRoleRecord = role;
-  if (!targetRoleRecord && targetRoleId === "Teacher") {
-    targetRoleRecord = await db.role.findUnique({ where: { name: "Teacher" } });
-  }
-  if (!targetRoleRecord) {
-    // "all" — broadcast to Teacher role by default if not found
-    targetRoleRecord = await db.role.findUnique({ where: { name: "Teacher" } });
-  }
   if (!targetRoleRecord) {
     return NextResponse.json({ error: "Target role not found" }, { status: 400 });
   }

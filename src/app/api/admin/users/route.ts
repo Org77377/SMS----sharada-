@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { hashPassword, ROLES } from "@/lib/auth";
+import { hashPassword, ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 export async function GET() {
   const session = await getCurrentUserWithRole();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const check = requireRole(session.payload, ROLES.SUPERADMIN, ROLES.PRINCIPAL, ROLES.COORDINATOR);
+  const check = requireRole(session.payload, ROLES.SUPERADMIN, ROLES.PRINCIPAL, ...REVIEWER_ROLES);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   const users = await db.user.findMany({
     include: { role: true },

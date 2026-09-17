@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { ROLES, TERMS } from "@/lib/auth";
+import { ROLES, REVIEWER_ROLES, TERMS } from "@/lib/auth";
 
 // GET /api/compile/[grade]?term=Term%201
 // Returns the compiled syllabus for a grade (optionally filtered by term).
@@ -13,7 +13,7 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const check = requireRole(
     session.payload,
-    ROLES.COORDINATOR,
+    ...REVIEWER_ROLES,
     ROLES.PRINCIPAL,
     ROLES.SUPERADMIN
   );

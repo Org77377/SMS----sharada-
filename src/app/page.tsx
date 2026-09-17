@@ -153,7 +153,9 @@ export default function Home() {
       rightSlot={rightSlot}
     >
       {user.role === "Teacher" && <TeacherDashboard user={user} />}
-      {(user.role === "Coordinator" || user.role === "Principal") && (
+      {(user.role === "HOD" ||
+        user.role === "Exam Coordinator" ||
+        user.role === "Principal") && (
         <CoordinatorDashboard user={user} />
       )}
       {user.role === "Superadmin" &&

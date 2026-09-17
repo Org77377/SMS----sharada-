@@ -40,9 +40,14 @@ export const COOKIE_NAME = "sms_token";
 export const ROLES = {
   SUPERADMIN: "Superadmin",
   PRINCIPAL: "Principal",
-  COORDINATOR: "Coordinator",
+  HOD: "HOD",
+  EXAM_COORDINATOR: "Exam Coordinator",
   TEACHER: "Teacher",
 } as const;
+
+// Reviewer roles — HOD and Exam Coordinator share identical permissions
+// (equivalent to the former "Coordinator" role).
+export const REVIEWER_ROLES = [ROLES.HOD, ROLES.EXAM_COORDINATOR] as const;
 
 export const UNIT_STATUS = {
   DRAFT: "DRAFT",

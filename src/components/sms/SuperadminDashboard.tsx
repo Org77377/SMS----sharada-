@@ -6,15 +6,19 @@ import {
   ShieldAlert as AuditIcon,
   BookMarked,
   CalendarRange,
+  Copy,
+  GraduationCap,
   History,
   Loader2,
   Plus,
   RefreshCw,
   ScrollText,
+  Search,
   ShieldCheck,
   Trash2,
   UserCog,
   Users,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,7 +58,29 @@ interface Props {
   user: AuthUser;
 }
 
-const ROLES_LIST: Role[] = ["Superadmin", "Principal", "Coordinator", "Teacher"];
+const ROLES_LIST: Role[] = [
+  "Superadmin",
+  "Principal",
+  "HOD",
+  "Exam Coordinator",
+  "Teacher",
+];
+
+// Generate a username from a full name: first name lowercased, or initials
+function suggestUsername(name: string): string {
+  const parts = name.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+  // first name + last initial
+  return parts[0] + parts[parts.length - 1][0];
+}
+
+function randomPassword(): string {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
 
 export function SuperadminDashboard({ user }: Props) {
   const [tab, setTab] = useState("users");
@@ -70,17 +96,20 @@ export function SuperadminDashboard({ user }: Props) {
   const [uRole, setURole] = useState<Role>("Teacher");
   const [uActive, setUActive] = useState(true);
   const [savingUser, setSavingUser] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
 
   // Assignments
   const [assignments, setAssignments] = useState<
-    (AuthUser extends never ? never : {
+    {
       id: string;
       teacher: { name: string; username: string };
       gradeId: string;
       subjectId: string;
       grade: { gradeNumber: number; displayName: string };
       subject: { name: string; code: string };
-    })[]
+    }[]
   >([]);
   const [loadingAssignments, setLoadingAssignments] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -90,11 +119,14 @@ export function SuperadminDashboard({ user }: Props) {
   const [aAy, setAAy] = useState("");
   const [savingAssign, setSavingAssign] = useState(false);
 
-  // Grades & subjects (for assignment creation)
+  // Grades & subjects
   const [grades, setGrades] = useState<{ id: string; gradeNumber: number; displayName: string }[]>([]);
   const [subjects, setSubjects] = useState<{ id: string; name: string; code: string }[]>([]);
   const [academicYears, setAcademicYears] = useState<{ id: string; year: string; active: boolean }[]>([]);
   const [activeAy, setActiveAy] = useState<string>("");
+  const [newGradeNum, setNewGradeNum] = useState("");
+  const [newGradeName, setNewGradeName] = useState("");
+  const [savingGrade, setSavingGrade] = useState(false);
 
   // New academic year
   const [newAyYear, setNewAyYear] = useState("");
@@ -165,6 +197,7 @@ export function SuperadminDashboard({ user }: Props) {
     if (tab === "audit") loadLogs();
   }, [tab, assignments.length, loadAssignments, loadLogs]);
 
+  // ---- User dialog helpers ----
   function openNewUser() {
     setEditingUser(null);
     setUName("");
@@ -172,6 +205,7 @@ export function SuperadminDashboard({ user }: Props) {
     setUPassword("");
     setURole("Teacher");
     setUActive(true);
+    setCreatedCreds(null);
     setShowUserDialog(true);
   }
 
@@ -182,7 +216,24 @@ export function SuperadminDashboard({ user }: Props) {
     setUPassword("");
     setURole(u.role);
     setUActive(u.active);
+    setCreatedCreds(null);
     setShowUserDialog(true);
+  }
+
+  // Auto-suggest username + password as the admin types the teacher's name
+  function onNameChange(name: string) {
+    setUName(name);
+    if (!editingUser && !createdCreds) {
+      const suggested = suggestUsername(name);
+      if (suggested) setUUsername(suggested);
+      if (!uPassword) setUPassword(randomPassword());
+    }
+  }
+
+  function regenerateCreds() {
+    if (editingUser) return;
+    setUUsername(suggestUsername(uName) || uUsername);
+    setUPassword(randomPassword());
   }
 
   async function saveUser() {
@@ -214,14 +265,22 @@ export function SuperadminDashboard({ user }: Props) {
           active: uActive,
         });
         toast.success("User created");
+        setCreatedCreds({ username: uUsername.trim(), password: uPassword });
       }
-      setShowUserDialog(false);
       loadUsers();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setSavingUser(false);
     }
+  }
+
+  function copyCreds() {
+    if (!createdCreds) return;
+    navigator.clipboard.writeText(
+      `Username: ${createdCreds.username}\nPassword: ${createdCreds.password}`
+    );
+    toast.success("Credentials copied to clipboard");
   }
 
   async function deleteUser(u: AuthUser) {
@@ -236,6 +295,7 @@ export function SuperadminDashboard({ user }: Props) {
     }
   }
 
+  // ---- Assignments ----
   async function saveAssignment() {
     if (!aTeacher || !aGrade || !aSubject || !aAy) {
       toast.error("All fields required");
@@ -273,6 +333,39 @@ export function SuperadminDashboard({ user }: Props) {
     }
   }
 
+  // ---- Grades ----
+  async function createGrade() {
+    const num = Number(newGradeNum);
+    if (!num || !newGradeName.trim()) {
+      toast.error("Grade number and display name required");
+      return;
+    }
+    setSavingGrade(true);
+    try {
+      await api.admin.createGrade({ gradeNumber: num, displayName: newGradeName.trim() });
+      toast.success("Grade added");
+      setNewGradeNum("");
+      setNewGradeName("");
+      loadMeta();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingGrade(false);
+    }
+  }
+
+  async function deleteGrade(id: string, name: string) {
+    if (!confirm(`Delete ${name}? This also removes its units and assignments.`)) return;
+    try {
+      await api.admin.deleteGrade(id);
+      toast.success("Grade removed");
+      loadMeta();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  // ---- Academic years ----
   async function createAcademicYear() {
     if (!newAyYear.trim()) {
       toast.error("Year is required (e.g. 2026-2027)");
@@ -292,6 +385,20 @@ export function SuperadminDashboard({ user }: Props) {
     }
   }
 
+  // ---- Derived ----
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter !== "all" && u.role !== roleFilter) return false;
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q)
+      );
+    });
+  }, [users, searchQuery, roleFilter]);
+
   const stats = useMemo(
     () => ({
       total: users.length,
@@ -303,14 +410,14 @@ export function SuperadminDashboard({ user }: Props) {
   );
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-6 sm:py-8">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
             Superadmin Console
           </h1>
           <Badge className="bg-violet-100 text-violet-700 border-0">
@@ -318,26 +425,30 @@ export function SuperadminDashboard({ user }: Props) {
           </Badge>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          Signed in as {user.name}. Manage users, assignments, academic years &amp;
-          audit trail.
+          Signed in as {user.name}. Manage users, assignments, grades &amp; audit trail.
         </p>
       </motion.div>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-5">
-        <TabsList className="bg-slate-100/80 p-1">
-          <TabsTrigger value="users" className="gap-1.5">
-            <Users className="h-4 w-4" /> Users
-          </TabsTrigger>
-          <TabsTrigger value="assignments" className="gap-1.5">
-            <BookMarked className="h-4 w-4" /> Assignments
-          </TabsTrigger>
-          <TabsTrigger value="academic" className="gap-1.5">
-            <CalendarRange className="h-4 w-4" /> Academic Years
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-1.5">
-            <History className="h-4 w-4" /> Audit Logs
-          </TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap sms-scroll">
+          <TabsList className="bg-slate-100/80 p-1 inline-flex">
+            <TabsTrigger value="users" className="gap-1.5">
+              <Users className="h-4 w-4" /> Users
+            </TabsTrigger>
+            <TabsTrigger value="grades" className="gap-1.5">
+              <GraduationCap className="h-4 w-4" /> Grades
+            </TabsTrigger>
+            <TabsTrigger value="assignments" className="gap-1.5">
+              <BookMarked className="h-4 w-4" /> Assignments
+            </TabsTrigger>
+            <TabsTrigger value="academic" className="gap-1.5">
+              <CalendarRange className="h-4 w-4" /> Academic Years
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1.5">
+              <History className="h-4 w-4" /> Audit Logs
+            </TabsTrigger>
+          </TabsList>
+        </ScrollArea>
 
         {/* USERS */}
         <TabsContent value="users" className="space-y-4">
@@ -348,7 +459,7 @@ export function SuperadminDashboard({ user }: Props) {
               { label: "Admin Staff", value: stats.admins, icon: ShieldCheck, color: "text-violet-600", bg: "bg-violet-50" },
               { label: "Inactive", value: stats.inactive, icon: UserCog, color: "text-rose-500", bg: "bg-rose-50" },
             ].map((s) => (
-              <Card key={s.label} className="border-slate-200/70 p-4">
+              <Card key={s.label} className="border-slate-200/70 p-3 sm:p-4">
                 <div className="flex items-center gap-3">
                   <div className={`grid h-9 w-9 place-items-center rounded-lg ${s.bg}`}>
                     <s.icon className={`h-4 w-4 ${s.color}`} />
@@ -364,8 +475,30 @@ export function SuperadminDashboard({ user }: Props) {
             ))}
           </div>
 
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Staff Directory</h2>
+          {/* Search + actions */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder="Search name, username or role…"
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="h-10 sm:w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {ROLES_LIST.map((r) => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={loadUsers} disabled={loadingUsers}>
                 <RefreshCw className={`h-4 w-4 ${loadingUsers ? "animate-spin" : ""}`} />
@@ -376,7 +509,8 @@ export function SuperadminDashboard({ user }: Props) {
             </div>
           </div>
 
-          <Card className="border-slate-200/70 overflow-hidden">
+          {/* Desktop: table; Mobile: cards */}
+          <Card className="hidden border-slate-200/70 overflow-hidden sm:block">
             <ScrollArea className="h-[60vh] sms-scroll">
               <Table>
                 <TableHeader>
@@ -390,7 +524,7 @@ export function SuperadminDashboard({ user }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u) => (
+                  {filteredUsers.map((u) => (
                     <TableRow key={u.id} className="hover:bg-slate-50/60">
                       <TableCell className="font-medium text-slate-800">{u.name}</TableCell>
                       <TableCell className="text-slate-500">@{u.username}</TableCell>
@@ -436,22 +570,152 @@ export function SuperadminDashboard({ user }: Props) {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {filteredUsers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-400">
+                        No users match your search.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </ScrollArea>
+          </Card>
+
+          {/* Mobile: card list */}
+          <div className="space-y-2 sm:hidden">
+            {filteredUsers.map((u) => (
+              <Card key={u.id} className="border-slate-200/70 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">{u.name}</p>
+                    <p className="truncate text-xs text-slate-500">@{u.username}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-[10px]">
+                        {u.role}
+                      </Badge>
+                      {u.active ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" /> Inactive
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEditUser(u)}>
+                      <UserCog className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600"
+                      onClick={() => deleteUser(u)}
+                      disabled={u.id === user.id}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+            {filteredUsers.length === 0 && (
+              <Card className="border-dashed border-slate-300 p-8 text-center">
+                <p className="text-sm text-slate-400">No users match your search.</p>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* GRADES */}
+        <TabsContent value="grades" className="space-y-4">
+          <Card className="border-slate-200/70 p-4 sm:p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-100 text-blue-600">
+                <GraduationCap className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Add Grade</h2>
+                <p className="text-xs text-slate-500">Grades are configurable — add or remove any.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Grade Number</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 11"
+                  value={newGradeNum}
+                  onChange={(e) => setNewGradeNum(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Display Name</Label>
+                <Input
+                  placeholder="e.g. Grade 11"
+                  value={newGradeName}
+                  onChange={(e) => setNewGradeName(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  disabled={savingGrade}
+                  onClick={createGrade}
+                >
+                  {savingGrade ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-1 h-4 w-4" />
+                  )}
+                  Add
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border-slate-200/70 p-4 sm:p-5">
+            <h2 className="mb-3 text-sm font-semibold text-slate-900">Existing Grades</h2>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {grades.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800">
+                      {g.displayName}
+                    </p>
+                    <p className="text-[11px] text-slate-400">#{g.gradeNumber}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 p-0 text-rose-500 hover:text-rose-600"
+                    onClick={() => deleteGrade(g.id, g.displayName)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              {grades.length === 0 && (
+                <p className="col-span-full py-6 text-center text-xs text-slate-400">
+                  No grades configured yet.
+                </p>
+              )}
+            </div>
           </Card>
         </TabsContent>
 
         {/* ASSIGNMENTS */}
         <TabsContent value="assignments" className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">
-                Teacher Assignments
-              </h2>
-              <p className="text-xs text-slate-500">
-                Map teachers to grades &amp; subjects for the active academic year.
-              </p>
+              <h2 className="text-sm font-semibold text-slate-900">Teacher Assignments</h2>
+              <p className="text-xs text-slate-500">Map teachers to grades &amp; subjects.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={loadAssignments} disabled={loadingAssignments}>
@@ -462,7 +726,7 @@ export function SuperadminDashboard({ user }: Props) {
               </Button>
             </div>
           </div>
-          <Card className="border-slate-200/70 overflow-hidden">
+          <Card className="hidden border-slate-200/70 overflow-hidden sm:block">
             <ScrollArea className="h-[55vh] sms-scroll">
               <Table>
                 <TableHeader>
@@ -485,9 +749,7 @@ export function SuperadminDashboard({ user }: Props) {
                       <TableRow key={a.id} className="hover:bg-slate-50/60">
                         <TableCell className="font-medium text-slate-800">
                           {a.teacher.name}
-                          <span className="ml-1 text-xs text-slate-400">
-                            @{a.teacher.username}
-                          </span>
+                          <span className="ml-1 text-xs text-slate-400">@{a.teacher.username}</span>
                         </TableCell>
                         <TableCell>{a.grade.displayName}</TableCell>
                         <TableCell>
@@ -511,6 +773,36 @@ export function SuperadminDashboard({ user }: Props) {
               </Table>
             </ScrollArea>
           </Card>
+          {/* Mobile assignment cards */}
+          <div className="space-y-2 sm:hidden">
+            {assignments.map((a) => (
+              <Card key={a.id} className="border-slate-200/70 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">{a.teacher.name}</p>
+                    <p className="truncate text-xs text-slate-500">@{a.teacher.username}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <Badge variant="secondary" className="bg-blue-50 text-blue-700 text-[10px]">{a.grade.displayName}</Badge>
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-[10px]">{a.subject.name}</Badge>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0 p-0 text-rose-500 hover:text-rose-600"
+                    onClick={() => removeAssignment(a.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+            {assignments.length === 0 && (
+              <Card className="border-dashed border-slate-300 p-8 text-center">
+                <p className="text-sm text-slate-400">No assignments yet.</p>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
         {/* ACADEMIC YEARS */}
@@ -521,15 +813,11 @@ export function SuperadminDashboard({ user }: Props) {
                 <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-100 text-blue-600">
                   <CalendarRange className="h-4 w-4" />
                 </div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Create Academic Year
-                </h2>
+                <h2 className="text-sm font-semibold text-slate-900">Create Academic Year</h2>
               </div>
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">
-                    Year (e.g. 2026-2027)
-                  </Label>
+                  <Label className="text-xs font-medium text-slate-600">Year (e.g. 2026-2027)</Label>
                   <Input
                     placeholder="2026-2027"
                     value={newAyYear}
@@ -538,61 +826,36 @@ export function SuperadminDashboard({ user }: Props) {
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
                   <div>
-                    <p className="text-sm font-medium text-slate-700">
-                      Set as active year
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Deactivates all other years.
-                    </p>
+                    <p className="text-sm font-medium text-slate-700">Set as active year</p>
+                    <p className="text-xs text-slate-500">Deactivates all other years.</p>
                   </div>
                   <Switch checked={newAyActive} onCheckedChange={setNewAyActive} />
                 </div>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  disabled={savingAy}
-                  onClick={createAcademicYear}
-                >
-                  {savingAy ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="mr-1 h-4 w-4" />
-                  )}
+                <Button className="bg-blue-600 hover:bg-blue-700" disabled={savingAy} onClick={createAcademicYear}>
+                  {savingAy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
                   Create
                 </Button>
               </div>
             </Card>
 
             <Card className="border-slate-200/70 p-5">
-              <h2 className="mb-3 text-sm font-semibold text-slate-900">
-                Existing Academic Years
-              </h2>
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Existing Academic Years</h2>
               <div className="space-y-2">
                 {academicYears.map((ay) => (
-                  <div
-                    key={ay.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5"
-                  >
+                  <div key={ay.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <CalendarRange className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-800">
-                        {ay.year}
-                      </span>
+                      <span className="text-sm font-medium text-slate-800">{ay.year}</span>
                     </div>
                     {ay.active ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-0">
-                        Active
-                      </Badge>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-0">Active</Badge>
                     ) : (
-                      <Badge variant="secondary" className="bg-slate-100 text-slate-500">
-                        Archived
-                      </Badge>
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-500">Archived</Badge>
                     )}
                   </div>
                 ))}
                 {academicYears.length === 0 && (
-                  <p className="py-6 text-center text-xs text-slate-400">
-                    No academic years yet.
-                  </p>
+                  <p className="py-6 text-center text-xs text-slate-400">No academic years yet.</p>
                 )}
               </div>
             </Card>
@@ -606,9 +869,7 @@ export function SuperadminDashboard({ user }: Props) {
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <AuditIcon className="h-4 w-4 text-slate-400" /> Audit Trail
               </h2>
-              <p className="text-xs text-slate-500">
-                Last 200 system actions.
-              </p>
+              <p className="text-xs text-slate-500">Last 200 system actions.</p>
             </div>
             <Button variant="outline" size="sm" onClick={loadLogs} disabled={loadingLogs}>
               <RefreshCw className={`h-4 w-4 ${loadingLogs ? "animate-spin" : ""}`} />
@@ -623,24 +884,16 @@ export function SuperadminDashboard({ user }: Props) {
                       <ScrollText className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-800">
-                          {log.action}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {formatDate(log.createdAt)}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-800">{log.action}</span>
+                        <span className="text-[11px] text-slate-400">{formatDate(log.createdAt)}</span>
                       </div>
-                      <p className="mt-0.5 text-xs text-slate-600">
-                        {log.detail || "—"}
-                      </p>
+                      <p className="mt-0.5 text-xs text-slate-600">{log.detail || "—"}</p>
                     </div>
                   </div>
                 ))}
                 {logs.length === 0 && (
-                  <div className="py-12 text-center text-sm text-slate-400">
-                    No audit entries yet.
-                  </div>
+                  <div className="py-12 text-center text-sm text-slate-400">No audit entries yet.</div>
                 )}
               </div>
             </ScrollArea>
@@ -656,16 +909,27 @@ export function SuperadminDashboard({ user }: Props) {
             <DialogDescription>
               {editingUser
                 ? `Editing @${editingUser.username}`
-                : "Create a new staff account."}
+                : "Create a new staff account. Username & password are auto-suggested — copy them to share with the staff member."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
               <Label className="text-xs">Full name</Label>
-              <Input value={uName} onChange={(e) => setUName(e.target.value)} placeholder="e.g. Omkar RG" />
+              <Input value={uName} onChange={(e) => onNameChange(e.target.value)} placeholder="e.g. Omkar RG" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Username</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Username</Label>
+                {!editingUser && (
+                  <button
+                    type="button"
+                    onClick={regenerateCreds}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    <Wand2 className="h-3 w-3" /> Auto-generate
+                  </button>
+                )}
+              </div>
               <Input
                 value={uUsername}
                 onChange={(e) => setUUsername(e.target.value)}
@@ -677,17 +941,23 @@ export function SuperadminDashboard({ user }: Props) {
               <Label className="text-xs">
                 Password{" "}
                 {editingUser && (
-                  <span className="font-normal text-slate-400">
-                    (leave blank to keep)
-                  </span>
+                  <span className="font-normal text-slate-400">(leave blank to keep)</span>
                 )}
               </Label>
-              <Input
-                type="password"
-                value={uPassword}
-                onChange={(e) => setUPassword(e.target.value)}
-                placeholder="••••••••"
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={uPassword}
+                  onChange={(e) => setUPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="font-mono"
+                />
+                {!editingUser && (
+                  <Button type="button" variant="outline" size="sm" onClick={regenerateCreds}>
+                    <Wand2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Role</Label>
@@ -697,9 +967,7 @@ export function SuperadminDashboard({ user }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {ROLES_LIST.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -708,14 +976,37 @@ export function SuperadminDashboard({ user }: Props) {
               <span className="text-sm font-medium text-slate-700">Active</span>
               <Switch checked={uActive} onCheckedChange={setUActive} />
             </div>
+
+            {/* Credentials summary after creation */}
+            {createdCreds && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <p className="mb-1 text-xs font-semibold text-emerald-800">
+                  ✓ Account created — share these credentials
+                </p>
+                <p className="font-mono text-xs text-emerald-900">
+                  Username: {createdCreds.username}
+                  <br />
+                  Password: {createdCreds.password}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                  onClick={copyCreds}
+                >
+                  <Copy className="mr-1 h-3 w-3" /> Copy
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUserDialog(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => { setShowUserDialog(false); setCreatedCreds(null); }}>
+              {createdCreds ? "Close" : "Cancel"}
             </Button>
             <Button onClick={saveUser} disabled={savingUser} className="bg-blue-600 hover:bg-blue-700">
               {savingUser && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              {editingUser ? "Save changes" : "Create user"}
+              {editingUser ? "Save changes" : createdCreds ? "Saved" : "Create user"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -738,13 +1029,11 @@ export function SuperadminDashboard({ user }: Props) {
                   <SelectValue placeholder="Select teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users
-                    .filter((u) => u.role === "Teacher")
-                    .map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name} (@{u.username})
-                      </SelectItem>
-                    ))}
+                  {users.filter((u) => u.role === "Teacher").map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} (@{u.username})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -756,9 +1045,7 @@ export function SuperadminDashboard({ user }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {grades.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.displayName}
-                    </SelectItem>
+                    <SelectItem key={g.id} value={g.id}>{g.displayName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -771,9 +1058,7 @@ export function SuperadminDashboard({ user }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {subjects.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </SelectItem>
+                    <SelectItem key={s.id} value={s.id}>{s.name} ({s.code})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -787,8 +1072,7 @@ export function SuperadminDashboard({ user }: Props) {
                 <SelectContent>
                   {academicYears.map((ay) => (
                     <SelectItem key={ay.id} value={ay.id}>
-                      {ay.year}
-                      {ay.active ? " (active)" : ""}
+                      {ay.year}{ay.active ? " (active)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -796,9 +1080,7 @@ export function SuperadminDashboard({ user }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
             <Button onClick={saveAssignment} disabled={savingAssign} className="bg-blue-600 hover:bg-blue-700">
               {savingAssign && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Assign

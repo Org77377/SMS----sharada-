@@ -1,6 +1,6 @@
 // Frontend API helpers + shared types
 
-export type Role = "Superadmin" | "Principal" | "Coordinator" | "Teacher";
+export type Role = "Superadmin" | "Principal" | "HOD" | "Exam Coordinator" | "Teacher";
 export type UnitStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
 export interface AuthUser {
@@ -197,6 +197,8 @@ export const api = {
         "/api/admin/grades",
         { method: "POST", body: JSON.stringify(body) }
       ),
+    deleteGrade: (id: string) =>
+      request<{ ok: true }>(`/api/admin/grades?id=${id}`, { method: "DELETE" }),
     createSubject: (body: { name: string; code: string }) =>
       request<{ subject: { id: string; name: string; code: string } }>(
         "/api/admin/subjects",
