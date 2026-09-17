@@ -170,8 +170,15 @@ export const api = {
       request<{ user: AuthUser }>("/api/admin/users", { method: "POST", body: JSON.stringify(body) }),
     updateUser: (id: string, body: Record<string, unknown>) =>
       request<{ user: AuthUser }>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-    deleteUser: (id: string) =>
-      request<{ ok: true }>(`/api/admin/users/${id}`, { method: "DELETE" }),
+    deleteUser: (id: string, passkey?: string) =>
+      request<{ ok: true }>(`/api/admin/users/${id}`, {
+        method: "DELETE",
+        body: passkey ? JSON.stringify({ passkey }) : undefined,
+      }),
+    clearTeachers: () =>
+      request<{ removed: number; message?: string }>(`/api/admin/users/clear-teachers`, {
+        method: "DELETE",
+      }),
     assignments: () =>
       request<{
         assignments: (Assignment & { teacher: { name: string; username: string } })[];

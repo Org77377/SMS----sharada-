@@ -99,6 +99,13 @@ export function SuperadminDashboard({ user }: Props) {
   const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  // Superadmin delete requires a passkey (opens a dedicated dialog)
+  const [superadminToDelete, setSuperadminToDelete] = useState<AuthUser | null>(null);
+  const [passkeyInput, setPasskeyInput] = useState("");
+  const [deletingSuperadmin, setDeletingSuperadmin] = useState(false);
+  // Clear all teachers
+  const [showClearTeachers, setShowClearTeachers] = useState(false);
+  const [clearingTeachers, setClearingTeachers] = useState(false);
 
   // Assignments
   const [assignments, setAssignments] = useState<
@@ -284,6 +291,12 @@ export function SuperadminDashboard({ user }: Props) {
   }
 
   async function deleteUser(u: AuthUser) {
+    // Superadmin accounts require a special passkey — open the passkey dialog.
+    if (u.role === "Superadmin") {
+      setSuperadminToDelete(u);
+      setPasskeyInput("");
+      return;
+    }
     if (!confirm(`Delete user "${u.name}" (@${u.username})? This cannot be undone.`))
       return;
     try {
@@ -292,6 +305,45 @@ export function SuperadminDashboard({ user }: Props) {
       loadUsers();
     } catch (e) {
       toast.error((e as Error).message);
+    }
+  }
+
+  async function confirmDeleteSuperadmin() {
+    if (!superadminToDelete) return;
+    if (!passkeyInput.trim()) {
+      toast.error("Passkey is required to remove a Superadmin.");
+      return;
+    }
+    setDeletingSuperadmin(true);
+    try {
+      await api.admin.deleteUser(superadminToDelete.id, passkeyInput.trim());
+      toast.success(`Superadmin ${superadminToDelete.username} removed`);
+      setSuperadminToDelete(null);
+      setPasskeyInput("");
+      loadUsers();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDeletingSuperadmin(false);
+    }
+  }
+
+  async function clearAllTeachers() {
+    setClearingTeachers(true);
+    try {
+      const { removed, message } = await api.admin.clearTeachers();
+      if (message && removed === 0) {
+        toast.info(message);
+      } else {
+        toast.success(`Removed ${removed} teacher account${removed === 1 ? "" : "s"}`);
+      }
+      setShowClearTeachers(false);
+      loadUsers();
+      if (tab === "assignments") loadAssignments();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setClearingTeachers(false);
     }
   }
 
@@ -502,6 +554,16 @@ export function SuperadminDashboard({ user }: Props) {
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={loadUsers} disabled={loadingUsers}>
                 <RefreshCw className={`h-4 w-4 ${loadingUsers ? "animate-spin" : ""}`} />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                onClick={() => setShowClearTeachers(true)}
+                disabled={stats.teachers === 0}
+                title="Remove all teacher accounts"
+              >
+                <Trash2 className="mr-1 h-4 w-4" /> Clear Teachers
               </Button>
               <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={openNewUser}>
                 <Plus className="mr-1 h-4 w-4" /> Add User
@@ -1084,6 +1146,110 @@ export function SuperadminDashboard({ user }: Props) {
             <Button onClick={saveAssignment} disabled={savingAssign} className="bg-blue-600 hover:bg-blue-700">
               {savingAssign && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Superadmin delete — passkey dialog */}
+      <Dialog
+        open={!!superadminToDelete}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSuperadminToDelete(null);
+            setPasskeyInput("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove Superadmin</DialogTitle>
+            <DialogDescription>
+              {superadminToDelete
+                ? `Removing ${superadminToDelete.name} (@${superadminToDelete.username}). This is a Superadmin account — enter the authorized passkey to confirm.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs text-amber-800">
+                <ShieldCheck className="mr-1 inline h-3.5 w-3.5" />
+                Superadmin removal is protected. Only someone with the authorized
+                passkey can complete this action. All attempts are logged.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Passkey</Label>
+              <Input
+                type="password"
+                autoFocus
+                placeholder="Enter passkey"
+                value={passkeyInput}
+                onChange={(e) => setPasskeyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") confirmDeleteSuperadmin();
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSuperadminToDelete(null);
+                setPasskeyInput("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDeleteSuperadmin}
+              disabled={deletingSuperadmin || !passkeyInput.trim()}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {deletingSuperadmin && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Remove Superadmin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear all teachers — confirmation */}
+      <Dialog open={showClearTeachers} onOpenChange={setShowClearTeachers}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clear all teachers</DialogTitle>
+            <DialogDescription>
+              This will permanently remove{" "}
+              <span className="font-semibold text-slate-900">
+                {stats.teachers} teacher account{stats.teachers === 1 ? "" : "s"}
+              </span>{" "}
+              along with their syllabus units and assignments. Admin staff
+              (Superadmin / Principal / HOD / Exam Coordinator) are{" "}
+              <span className="font-semibold">not</span> affected.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+            <p className="text-xs text-rose-700">
+              This action cannot be undone. Type nothing — just click{" "}
+              <span className="font-semibold">Clear Teachers</span> to confirm.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClearTeachers(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={clearAllTeachers}
+              disabled={clearingTeachers || stats.teachers === 0}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {clearingTeachers ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1 h-4 w-4" />
+              )}
+              Clear Teachers
             </Button>
           </DialogFooter>
         </DialogContent>

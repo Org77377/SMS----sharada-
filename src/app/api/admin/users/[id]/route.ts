@@ -37,7 +37,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getCurrentUserWithRole();
@@ -48,11 +48,42 @@ export async function DELETE(
   if (id === session.payload.userId) {
     return NextResponse.json({ error: "Cannot delete yourself" }, { status: 400 });
   }
-  const user = await db.user.findUnique({ where: { id } });
+  const user = await db.user.findUnique({ where: { id }, include: { role: true } });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Superadmin accounts require a special passkey to delete.
+  // The passkey is checked server-side only and never surfaced to the client.
+  if (user.role.name === ROLES.SUPERADMIN) {
+    let body: { passkey?: string } = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+    const SUPERADMIN_DELETE_PASSKEY = "alpha2026";
+    if (body.passkey !== SUPERADMIN_DELETE_PASSKEY) {
+      await db.auditLog.create({
+        data: {
+          actorId: session.payload.userId,
+          action: "SUPERADMIN_DELETE_DENIED",
+          detail: `Blocked delete attempt on superadmin ${user.username} (invalid/missing passkey)`,
+        },
+      });
+      return NextResponse.json(
+        { error: "This is a Superadmin account. A valid passkey is required to remove it." },
+        { status: 403 }
+      );
+    }
+  }
+
+  await db.unit.deleteMany({ where: { createdById: id } });
+  await db.teacherAssignment.deleteMany({ where: { teacherId: id } });
+  await db.notification.deleteMany({
+    where: { OR: [{ senderId: id }, { recipientId: id }] },
+  });
   await db.user.delete({ where: { id } });
   await db.auditLog.create({
-    data: { actorId: session.payload.userId, action: "USER_DELETE", detail: `Deleted user ${user.username}` },
+    data: { actorId: session.payload.userId, action: "USER_DELETE", detail: `Deleted user ${user.username} (${user.role.name})` },
   });
   return NextResponse.json({ ok: true });
 }
