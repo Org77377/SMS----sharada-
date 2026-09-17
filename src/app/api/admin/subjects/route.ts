@@ -4,8 +4,19 @@ import { getCurrentUserWithRole, requireRole } from "@/lib/session";
 import { ROLES } from "@/lib/auth";
 
 export async function GET() {
-  const subjects = await db.subject.findMany({ orderBy: { name: "asc" } });
-  return NextResponse.json({ subjects });
+  const subjects = await db.subject.findMany({
+    include: { department: true },
+    orderBy: { name: "asc" },
+  });
+  return NextResponse.json({
+    subjects: subjects.map((s) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      departmentId: s.departmentId,
+      departmentName: s.department?.name ?? null,
+    })),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -14,12 +25,16 @@ export async function POST(req: NextRequest) {
   const check = requireRole(session.payload, ROLES.SUPERADMIN);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   const body = await req.json();
-  const { name, code } = body;
+  const { name, code, departmentId } = body;
   if (!name || !code) {
     return NextResponse.json({ error: "name and code required" }, { status: 400 });
   }
   const subject = await db.subject.create({
-    data: { name: name.trim(), code: code.trim().toUpperCase() },
+    data: {
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      departmentId: departmentId || null,
+    },
   });
   await db.auditLog.create({
     data: { actorId: session.payload.userId, action: "SUBJECT_CREATE", detail: `Subject ${name} (${code})` },

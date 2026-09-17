@@ -9,7 +9,7 @@ export async function GET() {
   const check = requireRole(session.payload, ROLES.SUPERADMIN, ROLES.PRINCIPAL, ...REVIEWER_ROLES);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   const users = await db.user.findMany({
-    include: { role: true },
+    include: { role: true, department: true },
     orderBy: { createdAt: "asc" },
   });
   return NextResponse.json({
@@ -21,6 +21,8 @@ export async function GET() {
       roleId: u.roleId,
       active: u.active,
       createdAt: u.createdAt,
+      departmentId: u.departmentId,
+      departmentName: u.department?.name ?? null,
     })),
   });
 }
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 
   const body = await req.json();
-  const { name, username, password, roleName, active } = body;
+  const { name, username, password, roleName, active, departmentId } = body;
   if (!name || !username || !password || !roleName) {
     return NextResponse.json({ error: "name, username, password, roleName required" }, { status: 400 });
   }
@@ -49,13 +51,14 @@ export async function POST(req: NextRequest) {
       passwordHash: await hashPassword(password),
       roleId: role.id,
       active: active ?? true,
+      departmentId: departmentId || null,
     },
-    include: { role: true },
+    include: { role: true, department: true },
   });
   await db.auditLog.create({
     data: { actorId: session.payload.userId, action: "USER_CREATE", detail: `Created user ${user.username} (${role.name})` },
   });
   return NextResponse.json({
-    user: { id: user.id, name: user.name, username: user.username, role: user.role.name, active: user.active, createdAt: user.createdAt },
+    user: { id: user.id, name: user.name, username: user.username, role: user.role.name, active: user.active, createdAt: user.createdAt, departmentId: user.departmentId, departmentName: user.department?.name ?? null },
   }, { status: 201 });
 }

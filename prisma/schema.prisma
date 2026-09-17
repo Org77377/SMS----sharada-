@@ -11,9 +11,17 @@ datasource db {
 
 model Role {
   id        String   @id @default(cuid())
-  name      String   @unique // Superadmin | Principal | Coordinator | Teacher
+  name      String   @unique // Superadmin | Principal | HOD | Exam Coordinator | Teacher
   users     User[]
   notifications Notification[]
+  createdAt DateTime @default(now())
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g. "Science & Mathematics", "Languages"
+  subjects  Subject[]
+  hods      User[]
   createdAt DateTime @default(now())
 }
 
@@ -24,6 +32,8 @@ model User {
   passwordHash String
   roleId       String
   role         Role     @relation(fields: [roleId], references: [id])
+  departmentId String?  // for HODs — which department they head
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -47,6 +57,8 @@ model Subject {
   id          String   @id @default(cuid())
   name        String   @unique
   code        String   @unique
+  departmentId String?  // which department this subject belongs to
+  department  Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   assignments TeacherAssignment[]
   units       Unit[]
   createdAt   DateTime @default(now())

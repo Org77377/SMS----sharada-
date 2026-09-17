@@ -2,16 +2,23 @@ import { db } from "../src/lib/db";
 import { hashPassword, ROLES } from "../src/lib/auth";
 
 const SUBJECTS = [
-  { name: "Kannada", code: "KAN" },
-  { name: "English", code: "ENG" },
-  { name: "Hindi", code: "HIN" },
-  { name: "Mathematics", code: "MAT" },
-  { name: "Science", code: "SCI" },
-  { name: "Social Science", code: "SST" },
-  { name: "Computer Science", code: "CSC" },
-  { name: "Physical Education", code: "PED" },
-  { name: "General Knowledge", code: "GK" },
-  { name: "Art", code: "ART" },
+  { name: "Kannada", code: "KAN", dept: "Languages" },
+  { name: "English", code: "ENG", dept: "Languages" },
+  { name: "Hindi", code: "HIN", dept: "Languages" },
+  { name: "Mathematics", code: "MAT", dept: "Science & Mathematics" },
+  { name: "Science", code: "SCI", dept: "Science & Mathematics" },
+  { name: "Computer Science", code: "CSC", dept: "Science & Mathematics" },
+  { name: "Social Science", code: "SST", dept: "Social Sciences" },
+  { name: "Physical Education", code: "PED", dept: "Co-curricular" },
+  { name: "General Knowledge", code: "GK", dept: "Co-curricular" },
+  { name: "Art", code: "ART", dept: "Co-curricular" },
+];
+
+const DEPARTMENTS = [
+  "Languages",
+  "Science & Mathematics",
+  "Social Sciences",
+  "Co-curricular",
 ];
 
 async function main() {
@@ -29,6 +36,18 @@ async function main() {
   }
   console.log("✓ Roles");
 
+  // Departments
+  const depts = {} as Record<string, { id: string }>;
+  for (const name of DEPARTMENTS) {
+    const d = await db.department.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+    depts[name] = d;
+  }
+  console.log(`✓ ${DEPARTMENTS.length} departments`);
+
   // Grades 4..10
   const grades = {} as Record<number, { id: string }>;
   for (let g = 4; g <= 10; g++) {
@@ -41,16 +60,16 @@ async function main() {
   }
   console.log("✓ Grades 4–10");
 
-  // Subjects
+  // Subjects (with department link)
   for (const s of SUBJECTS) {
     await db.subject.upsert({
       where: { code: s.code },
-      update: { name: s.name },
-      create: s,
+      update: { name: s.name, departmentId: depts[s.dept].id },
+      create: { name: s.name, code: s.code, departmentId: depts[s.dept].id },
     });
   }
-  const allSubjects = await db.subject.findMany();
-  console.log(`✓ ${allSubjects.length} subjects`);
+  const allSubjects = await db.subject.findMany({ include: { department: true } });
+  console.log(`✓ ${allSubjects.length} subjects (linked to departments)`);
 
   // Academic year
   const ay = await db.academicYear.upsert({
@@ -88,18 +107,20 @@ async function main() {
     },
   });
 
+  // HOD — assigned to the "Science & Mathematics" department
   const coordinator = await db.user.upsert({
     where: { username: "coordinator" },
-    update: { name: "Mahadev Desai", roleId: roles[ROLES.HOD].id },
+    update: { name: "Mahadev Desai", roleId: roles[ROLES.HOD].id, departmentId: depts["Science & Mathematics"].id },
     create: {
       name: "Mahadev Desai",
       username: "coordinator",
       passwordHash: defaultPassword,
       roleId: roles[ROLES.HOD].id,
+      departmentId: depts["Science & Mathematics"].id,
       active: true,
     },
   });
-  // Exam Coordinator — same permissions as HOD
+  // Exam Coordinator — same permissions as HOD (no department scoping)
   await db.user.upsert({
     where: { username: "examcoord" },
     update: { name: "Suresh Pujari", roleId: roles[ROLES.EXAM_COORDINATOR].id },

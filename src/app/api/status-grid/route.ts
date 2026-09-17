@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUserWithRole, requireRole } from "@/lib/session";
+import { getCurrentUserWithRole, requireRole, getDepartmentScope } from "@/lib/session";
 import { ROLES, REVIEWER_ROLES } from "@/lib/auth";
 
 // Returns a matrix of grade × subject with status counts + term breakdown.
@@ -18,8 +18,12 @@ export async function GET() {
   const ay = await db.academicYear.findFirst({ where: { active: true } });
   if (!ay) return NextResponse.json({ grid: [], academicYear: null });
 
+  // Department scoping for HODs — only see their department's subjects
+  const scope = await getDepartmentScope(session);
+  const subjectFilter = scope.subjectIds ? { id: { in: scope.subjectIds } } : {};
+
   const units = await db.unit.findMany({
-    where: { academicYearId: ay.id },
+    where: { academicYearId: ay.id, subject: subjectFilter },
     include: {
       grade: true,
       subject: true,
@@ -27,7 +31,7 @@ export async function GET() {
     },
   });
   const grades = await db.grade.findMany({ orderBy: { gradeNumber: "asc" } });
-  const subjects = await db.subject.findMany({ orderBy: { name: "asc" } });
+  const subjects = await db.subject.findMany({ where: subjectFilter, orderBy: { name: "asc" } });
   const terms = ["Term 1", "Term 2"];
 
   type Cell = {

@@ -19,6 +19,7 @@ import {
   UserCog,
   Users,
   Wand2,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -52,7 +53,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { api, formatDate, type AuthUser, type Role } from "@/lib/api";
+import { api, formatDate, type AuthUser, type Role, type Department } from "@/lib/api";
 
 interface Props {
   user: AuthUser;
@@ -128,12 +129,19 @@ export function SuperadminDashboard({ user }: Props) {
 
   // Grades & subjects
   const [grades, setGrades] = useState<{ id: string; gradeNumber: number; displayName: string }[]>([]);
-  const [subjects, setSubjects] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [subjects, setSubjects] = useState<{ id: string; name: string; code: string; departmentId: string | null; departmentName: string | null }[]>([]);
   const [academicYears, setAcademicYears] = useState<{ id: string; year: string; active: boolean }[]>([]);
   const [activeAy, setActiveAy] = useState<string>("");
   const [newGradeNum, setNewGradeNum] = useState("");
   const [newGradeName, setNewGradeName] = useState("");
   const [savingGrade, setSavingGrade] = useState(false);
+
+  // Departments
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [newDeptName, setNewDeptName] = useState("");
+  const [savingDept, setSavingDept] = useState(false);
+  // Department field on the user dialog (for HODs)
+  const [uDepartmentId, setUDepartmentId] = useState<string>("");
 
   // New academic year
   const [newAyYear, setNewAyYear] = useState("");
@@ -170,14 +178,16 @@ export function SuperadminDashboard({ user }: Props) {
   }, []);
 
   const loadMeta = useCallback(async () => {
-    const [g, s, y] = await Promise.all([
+    const [g, s, y, d] = await Promise.all([
       api.grades(),
       api.subjects(),
       api.admin.academicYears(),
+      api.admin.departments(),
     ]);
     setGrades(g.grades);
-    setSubjects(s.subjects);
+    setSubjects(s.subjects as typeof subjects);
     setAcademicYears(y.years);
+    setDepartments(d.departments);
     const active = y.years.find((ay) => ay.active);
     if (active) setActiveAy(active.id);
   }, []);
@@ -212,6 +222,7 @@ export function SuperadminDashboard({ user }: Props) {
     setUPassword("");
     setURole("Teacher");
     setUActive(true);
+    setUDepartmentId("");
     setCreatedCreds(null);
     setShowUserDialog(true);
   }
@@ -223,6 +234,7 @@ export function SuperadminDashboard({ user }: Props) {
     setUPassword("");
     setURole(u.role);
     setUActive(u.active);
+    setUDepartmentId(u.departmentId ?? "");
     setCreatedCreds(null);
     setShowUserDialog(true);
   }
@@ -261,6 +273,8 @@ export function SuperadminDashboard({ user }: Props) {
           active: uActive,
         };
         if (uPassword) body.password = uPassword;
+        if (uRole === "HOD") body.departmentId = uDepartmentId || null;
+        else body.departmentId = null;
         await api.admin.updateUser(editingUser.id, body);
         toast.success("User updated");
       } else {
@@ -270,6 +284,7 @@ export function SuperadminDashboard({ user }: Props) {
           password: uPassword,
           roleName: uRole,
           active: uActive,
+          departmentId: uRole === "HOD" ? (uDepartmentId || undefined) : undefined,
         });
         toast.success("User created");
         setCreatedCreds({ username: uUsername.trim(), password: uPassword });
@@ -417,6 +432,48 @@ export function SuperadminDashboard({ user }: Props) {
     }
   }
 
+  // ---- Departments ----
+  async function createDepartment() {
+    if (!newDeptName.trim()) {
+      toast.error("Department name required");
+      return;
+    }
+    setSavingDept(true);
+    try {
+      await api.admin.createDepartment(newDeptName.trim());
+      toast.success("Department created");
+      setNewDeptName("");
+      loadMeta();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingDept(false);
+    }
+  }
+
+  async function deleteDepartment(id: string, name: string) {
+    if (!confirm(`Delete department "${name}"? Subjects in it will become unassigned.`)) return;
+    try {
+      await api.admin.deleteDepartment(id);
+      toast.success("Department removed");
+      loadMeta();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  async function assignSubjectDepartment(subjectId: string, departmentId: string) {
+    try {
+      await api.admin.updateSubject(subjectId, {
+        departmentId: departmentId || null,
+      });
+      loadMeta();
+      toast.success("Department assigned");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
   // ---- Academic years ----
   async function createAcademicYear() {
     if (!newAyYear.trim()) {
@@ -489,6 +546,9 @@ export function SuperadminDashboard({ user }: Props) {
             </TabsTrigger>
             <TabsTrigger value="grades" className="gap-1.5">
               <GraduationCap className="h-4 w-4" /> Grades
+            </TabsTrigger>
+            <TabsTrigger value="departments" className="gap-1.5">
+              <Building2 className="h-4 w-4" /> Departments
             </TabsTrigger>
             <TabsTrigger value="assignments" className="gap-1.5">
               <BookMarked className="h-4 w-4" /> Assignments
@@ -772,6 +832,103 @@ export function SuperadminDashboard({ user }: Props) {
           </Card>
         </TabsContent>
 
+        {/* DEPARTMENTS */}
+        <TabsContent value="departments" className="space-y-4">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card className="border-slate-200/70 p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-100 text-blue-600">
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Add Department</h2>
+                  <p className="text-xs text-slate-500">Group subjects under departments for HOD oversight.</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Department Name</Label>
+                  <Input
+                    placeholder="e.g. Science & Mathematics"
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") createDepartment(); }}
+                  />
+                </div>
+                <Button className="bg-blue-600 hover:bg-blue-700" disabled={savingDept} onClick={createDepartment}>
+                  {savingDept ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
+                  Add Department
+                </Button>
+              </div>
+            </Card>
+
+            <Card className="border-slate-200/70 p-5">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">Existing Departments</h2>
+              <div className="space-y-2">
+                {departments.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm font-medium text-slate-800">{d.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-500 text-[10px]">
+                        {d.subjectCount} subjects · {d.hodCount} HOD{d.hodCount === 1 ? "" : "s"}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600"
+                        onClick={() => deleteDepartment(d.id, d.name)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {departments.length === 0 && (
+                  <p className="py-6 text-center text-xs text-slate-400">No departments yet.</p>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Subject → Department assignment */}
+          <Card className="border-slate-200/70 p-5">
+            <h2 className="mb-1 text-sm font-semibold text-slate-900">Assign Subjects to Departments</h2>
+            <p className="mb-3 text-xs text-slate-500">
+              An HOD assigned to a department will only see submissions for subjects in that department.
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {subjects.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-800">{s.name}</p>
+                    <p className="text-[11px] text-slate-400">{s.code}</p>
+                  </div>
+                  <Select
+                    value={s.departmentId ?? "none"}
+                    onValueChange={(v) => assignSubjectDepartment(s.id, v === "none" ? "" : v)}
+                  >
+                    <SelectTrigger className="h-8 w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— No department —</SelectItem>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+              {subjects.length === 0 && (
+                <p className="col-span-full py-6 text-center text-xs text-slate-400">No subjects yet.</p>
+              )}
+            </div>
+          </Card>
+        </TabsContent>
+
         {/* ASSIGNMENTS */}
         <TabsContent value="assignments" className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1034,6 +1191,24 @@ export function SuperadminDashboard({ user }: Props) {
                 </SelectContent>
               </Select>
             </div>
+            {uRole === "HOD" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Department (HOD oversight)</Label>
+                <Select value={uDepartmentId} onValueChange={setUDepartmentId}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="— Select department —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-slate-400">
+                  This HOD will only see submissions for subjects in this department.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
               <span className="text-sm font-medium text-slate-700">Active</span>
               <Switch checked={uActive} onCheckedChange={setUActive} />

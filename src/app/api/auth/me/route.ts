@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole } from "@/lib/session";
+import { SUBMISSION_ROLES } from "@/lib/auth";
 
 export async function GET() {
   const session = await getCurrentUserWithRole();
@@ -8,9 +9,12 @@ export async function GET() {
     return NextResponse.json({ user: null }, { status: 200 });
   }
   const { user } = session;
-  // Load teacher assignments if teacher
+  const roleName = user!.role.name;
+
+  // Load teacher assignments for any role that can submit syllabus
+  // (Teacher, HOD, Exam Coordinator, Principal — if they take subjects).
   let assignments: { gradeId: string; subjectId: string; grade: { id: string; gradeNumber: number; displayName: string }; subject: { id: string; name: string; code: string } }[] = [];
-  if (user!.role.name === "Teacher") {
+  if ((SUBMISSION_ROLES as readonly string[]).includes(roleName)) {
     const ay = await db.academicYear.findFirst({ where: { active: true } });
     if (ay) {
       const raw = await db.teacherAssignment.findMany({
@@ -31,9 +35,11 @@ export async function GET() {
       id: user!.id,
       name: user!.name,
       username: user!.username,
-      role: user!.role.name,
+      role: roleName,
       roleId: user!.roleId,
       active: user!.active,
+      departmentId: user!.departmentId ?? null,
+      departmentName: user!.department?.name ?? null,
     },
     assignments,
   });

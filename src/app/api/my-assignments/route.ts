@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUserWithRole, requireRole } from "@/lib/session";
+import { SUBMISSION_ROLES } from "@/lib/auth";
 
 export async function GET() {
   const session = await getCurrentUserWithRole();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { user } = session;
-  const check = requireRole(session.payload, "Teacher");
+  const check = requireRole(session.payload, ...SUBMISSION_ROLES);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 
   const ay = await db.academicYear.findFirst({ where: { active: true } });

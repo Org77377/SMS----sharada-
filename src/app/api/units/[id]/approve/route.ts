@@ -18,6 +18,16 @@ export async function POST(
   });
   if (!unit) return NextResponse.json({ error: "Unit not found" }, { status: 404 });
 
+  // HODs can only approve units for subjects in their department
+  if (session.payload.role === ROLES.HOD && session.user!.departmentId) {
+    if (unit.subject.departmentId !== session.user!.departmentId) {
+      return NextResponse.json(
+        { error: "This unit belongs to a subject outside your department." },
+        { status: 403 }
+      );
+    }
+  }
+
   const updated = await db.unit.update({
     where: { id },
     data: { status: UNIT_STATUS.APPROVED, feedback: null },

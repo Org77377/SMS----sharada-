@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUserWithRole, requireRole } from "@/lib/session";
+import { getCurrentUserWithRole, requireRole, getDepartmentScope } from "@/lib/session";
 import { ROLES, REVIEWER_ROLES, TERMS } from "@/lib/auth";
 
 // GET /api/compile/[grade]?term=Term%201
@@ -30,10 +30,15 @@ export async function GET(
   const ay = await db.academicYear.findFirst({ where: { active: true } });
   if (!ay) return NextResponse.json({ error: "No active academic year" }, { status: 400 });
 
+  // Department scoping for HODs — only compile their department's subjects
+  const scope = await getDepartmentScope(session);
+  const subjectFilter = scope.subjectIds ? { id: { in: scope.subjectIds } } : {};
+
   const where = {
     gradeId: grade.id,
     academicYearId: ay.id,
     status: "APPROVED",
+    subject: subjectFilter,
     ...(termFilter ? { term: termFilter } : {}),
   };
   const units = await db.unit.findMany({

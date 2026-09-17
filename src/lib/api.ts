@@ -10,6 +10,8 @@ export interface AuthUser {
   role: Role;
   roleId: string;
   active: boolean;
+  departmentId?: string | null;
+  departmentName?: string | null;
 }
 export interface Assignment {
   id?: string;
@@ -21,6 +23,13 @@ export interface Assignment {
 export interface MeResponse {
   user: AuthUser | null;
   assignments?: Assignment[];
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  subjectCount: number;
+  hodCount: number;
 }
 
 export interface Unit {
@@ -206,11 +215,25 @@ export const api = {
       ),
     deleteGrade: (id: string) =>
       request<{ ok: true }>(`/api/admin/grades?id=${id}`, { method: "DELETE" }),
-    createSubject: (body: { name: string; code: string }) =>
+    createSubject: (body: { name: string; code: string; departmentId?: string }) =>
       request<{ subject: { id: string; name: string; code: string } }>(
         "/api/admin/subjects",
         { method: "POST", body: JSON.stringify(body) }
       ),
+    updateSubject: (id: string, body: Record<string, unknown>) =>
+      request<{ subject: { id: string; name: string; code: string; departmentId: string | null; departmentName: string | null } }>(
+        `/api/admin/subjects/${id}`,
+        { method: "PATCH", body: JSON.stringify(body) }
+      ),
+    departments: () =>
+      request<{ departments: Department[] }>("/api/admin/departments"),
+    createDepartment: (name: string) =>
+      request<{ department: { id: string; name: string } }>(
+        "/api/admin/departments",
+        { method: "POST", body: JSON.stringify({ name }) }
+      ),
+    deleteDepartment: (id: string) =>
+      request<{ ok: true }>(`/api/admin/departments?id=${id}`, { method: "DELETE" }),
   },
 };
 

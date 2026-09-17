@@ -49,6 +49,14 @@ export const ROLES = {
 // (equivalent to the former "Coordinator" role).
 export const REVIEWER_ROLES = [ROLES.HOD, ROLES.EXAM_COORDINATOR] as const;
 
+// Roles that can submit syllabus (teachers + academic staff who also teach).
+export const SUBMISSION_ROLES = [
+  ROLES.TEACHER,
+  ROLES.HOD,
+  ROLES.EXAM_COORDINATOR,
+  ROLES.PRINCIPAL,
+] as const;
+
 export const UNIT_STATUS = {
   DRAFT: "DRAFT",
   SUBMITTED: "SUBMITTED",

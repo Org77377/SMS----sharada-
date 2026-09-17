@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUserWithRole, requireRole } from "@/lib/session";
-import { UNIT_STATUS } from "@/lib/auth";
+import { getCurrentUserWithRole, requireRole, getDepartmentScope } from "@/lib/session";
+import { UNIT_STATUS, ROLES, SUBMISSION_ROLES } from "@/lib/auth";
 
 // GET /api/units?gradeId=&subjectId=&term=&status=&createdById=
 export async function GET(req: NextRequest) {
@@ -16,12 +16,24 @@ export async function GET(req: NextRequest) {
   const createdById = searchParams.get("createdById");
 
   const role = session.payload.role;
-  // Teachers only see their own units
   const where: Record<string, unknown> = {};
-  if (role === "Teacher") {
+
+  if (role === ROLES.TEACHER) {
+    // Teachers only see their own units
     where.createdById = session.payload.userId;
-  } else if (createdById) {
-    where.createdById = createdById;
+  } else {
+    // Reviewers (HOD/EC/Principal/Superadmin):
+    // - If status=SUBMITTED (review queue), scope by department for HODs
+    // - Otherwise show all (for compile/status purposes, department scoping is
+    //   applied at the status-grid / compile endpoints which already filter)
+    if (status === "SUBMITTED") {
+      const scope = await getDepartmentScope(session);
+      if (scope.subjectIds) {
+        where.subjectId = { in: scope.subjectIds };
+      }
+    } else if (createdById) {
+      where.createdById = createdById;
+    }
   }
   if (gradeId) where.gradeId = gradeId;
   if (subjectId) where.subjectId = subjectId;
@@ -43,7 +55,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getCurrentUserWithRole();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const check = requireRole(session.payload, "Teacher");
+  // Teachers, HODs, Exam Coordinators and Principals can all submit syllabus
+  // (if they are assigned to the grade+subject by the superadmin).
+  const check = requireRole(session.payload, ...SUBMISSION_ROLES);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 
   const body = await req.json();
@@ -54,7 +68,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  // Ensure teacher is assigned to this grade+subject for active academic year
+  // Ensure the submitter is assigned to this grade+subject for active academic year
   const ay = await db.academicYear.findFirst({ where: { active: true } });
   if (!ay) return NextResponse.json({ error: "No active academic year" }, { status: 400 });
 

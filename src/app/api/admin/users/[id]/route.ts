@@ -24,15 +24,33 @@ export async function PATCH(
     if (!role) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     data.roleId = role.id;
   }
+  if (body.departmentId !== undefined) {
+    // null clears the department; otherwise validate it exists
+    if (body.departmentId === null || body.departmentId === "") {
+      data.departmentId = null;
+    } else {
+      const dept = await db.department.findUnique({ where: { id: body.departmentId } });
+      if (!dept) return NextResponse.json({ error: "Department not found" }, { status: 400 });
+      data.departmentId = body.departmentId;
+    }
+  }
   if (body.password) {
     data.passwordHash = await hashPassword(body.password);
   }
-  const updated = await db.user.update({ where: { id }, data, include: { role: true } });
+  const updated = await db.user.update({ where: { id }, data, include: { role: true, department: true } });
   await db.auditLog.create({
     data: { actorId: session.payload.userId, action: "USER_UPDATE", detail: `Updated user ${updated.username}` },
   });
   return NextResponse.json({
-    user: { id: updated.id, name: updated.name, username: updated.username, role: updated.role.name, active: updated.active },
+    user: {
+      id: updated.id,
+      name: updated.name,
+      username: updated.username,
+      role: updated.role.name,
+      active: updated.active,
+      departmentId: updated.departmentId,
+      departmentName: updated.department?.name ?? null,
+    },
   });
 }
 

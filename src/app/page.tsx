@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, LayoutDashboard, Settings2 } from "lucide-react";
+import { Loader2, LayoutDashboard, Settings2, BookOpen } from "lucide-react";
 import { AppShell } from "@/components/sms/AppShell";
 import { LoginView } from "@/components/sms/LoginView";
 import { TeacherDashboard } from "@/components/sms/TeacherDashboard";
@@ -11,6 +11,7 @@ import { NotificationPanel } from "@/components/sms/NotificationPanel";
 import {
   api,
   type AuthUser,
+  type Assignment,
   type NotificationItem,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -19,17 +20,23 @@ import { Button } from "@/components/ui/button";
 export default function Home() {
   const [bootstrapping, setBootstrapping] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const [superadminView, setSuperadminView] = useState<"management" | "review">(
     "management"
   );
+  // HOD / Exam Coordinator / Principal: toggle between "My Syllabus" and "Review Console"
+  const [reviewerView, setReviewerView] = useState<"review" | "submission">(
+    "review"
+  );
 
   const bootstrap = useCallback(async () => {
     try {
-      const { user } = await api.me();
+      const { user, assignments } = await api.me();
       setUser(user);
+      setAssignments(assignments ?? []);
       if (user) await loadNotifications();
     } catch {
       setUser(null);
@@ -55,6 +62,14 @@ export default function Home() {
   async function handleLogin(u: AuthUser) {
     setUser(u);
     setBootstrapping(false);
+    // Load assignments for submission-eligible roles
+    try {
+      const { assignments } = await api.me();
+      setAssignments(assignments ?? []);
+    } catch {
+      setAssignments([]);
+    }
+    setReviewerView("review");
     await loadNotifications();
     toast.success(`Welcome, ${u.name.split(" ")[0]}!`);
   }
@@ -66,9 +81,11 @@ export default function Home() {
       // ignore
     }
     setUser(null);
+    setAssignments([]);
     setNotifications([]);
     setUnreadCount(0);
     setSuperadminView("management");
+    setReviewerView("review");
     toast.success("Signed out");
   }
 
@@ -111,6 +128,14 @@ export default function Home() {
 
   // Superadmin can toggle between management & review console
   const isSuperadmin = user.role === "Superadmin";
+  const isReviewerRole =
+    user.role === "HOD" ||
+    user.role === "Exam Coordinator" ||
+    user.role === "Principal";
+  // Show the "My Syllabus / Review Console" toggle for reviewer roles only if
+  // they have teaching assignments (assigned by superadmin).
+  const canSubmitSyllabus = isReviewerRole && assignments.length > 0;
+
   const rightSlot = isSuperadmin ? (
     <div className="hidden items-center gap-1 rounded-xl bg-slate-100 p-1 sm:flex">
       <Button
@@ -138,6 +163,33 @@ export default function Home() {
         <LayoutDashboard className="h-3.5 w-3.5" /> Review Console
       </Button>
     </div>
+  ) : canSubmitSyllabus ? (
+    <div className="hidden items-center gap-1 rounded-xl bg-slate-100 p-1 sm:flex">
+      <Button
+        size="sm"
+        variant={reviewerView === "review" ? "default" : "ghost"}
+        className={`h-8 gap-1.5 ${
+          reviewerView === "review"
+            ? "bg-white text-slate-900 shadow-sm hover:bg-white"
+            : "text-slate-500 hover:bg-transparent"
+        }`}
+        onClick={() => setReviewerView("review")}
+      >
+        <LayoutDashboard className="h-3.5 w-3.5" /> Review Console
+      </Button>
+      <Button
+        size="sm"
+        variant={reviewerView === "submission" ? "default" : "ghost"}
+        className={`h-8 gap-1.5 ${
+          reviewerView === "submission"
+            ? "bg-white text-slate-900 shadow-sm hover:bg-white"
+            : "text-slate-500 hover:bg-transparent"
+        }`}
+        onClick={() => setReviewerView("submission")}
+      >
+        <BookOpen className="h-3.5 w-3.5" /> My Syllabus
+      </Button>
+    </div>
   ) : undefined;
 
   return (
@@ -153,11 +205,12 @@ export default function Home() {
       rightSlot={rightSlot}
     >
       {user.role === "Teacher" && <TeacherDashboard user={user} />}
-      {(user.role === "HOD" ||
-        user.role === "Exam Coordinator" ||
-        user.role === "Principal") && (
-        <CoordinatorDashboard user={user} />
-      )}
+      {isReviewerRole &&
+        (reviewerView === "submission" && canSubmitSyllabus ? (
+          <TeacherDashboard user={user} />
+        ) : (
+          <CoordinatorDashboard user={user} />
+        ))}
       {user.role === "Superadmin" &&
         (superadminView === "management" ? (
           <SuperadminDashboard user={user} />
