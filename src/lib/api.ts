@@ -193,8 +193,8 @@ export const api = {
         assignments: (Assignment & { teacher: { name: string; username: string } })[];
         academicYear: { id: string; year: string } | null;
       }>("/api/admin/assignments"),
-    createAssignment: (body: { teacherId: string; gradeId: string; subjectId: string; academicYearId: string }) =>
-      request<{ assignment: unknown }>("/api/admin/assignments", { method: "POST", body: JSON.stringify(body) }),
+    createAssignment: (body: { teacherId: string; gradeIds: string[]; subjectId: string; academicYearId: string }) =>
+      request<{ created: number; requested: number }>("/api/admin/assignments", { method: "POST", body: JSON.stringify(body) }),
     deleteAssignment: (id: string) =>
       request<{ ok: true }>(`/api/admin/assignments?id=${id}`, { method: "DELETE" }),
     academicYears: () =>

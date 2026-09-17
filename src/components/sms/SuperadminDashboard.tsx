@@ -44,6 +44,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -122,7 +123,7 @@ export function SuperadminDashboard({ user }: Props) {
   const [loadingAssignments, setLoadingAssignments] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [aTeacher, setATeacher] = useState("");
-  const [aGrade, setAGrade] = useState("");
+  const [aGrades, setAGrades] = useState<string[]>([]); // multi-grade selection
   const [aSubject, setASubject] = useState("");
   const [aAy, setAAy] = useState("");
   const [savingAssign, setSavingAssign] = useState(false);
@@ -364,22 +365,27 @@ export function SuperadminDashboard({ user }: Props) {
 
   // ---- Assignments ----
   async function saveAssignment() {
-    if (!aTeacher || !aGrade || !aSubject || !aAy) {
-      toast.error("All fields required");
+    if (!aTeacher || aGrades.length === 0 || !aSubject || !aAy) {
+      toast.error("All fields required — select at least one grade");
       return;
     }
     setSavingAssign(true);
     try {
-      await api.admin.createAssignment({
+      const { created, requested } = await api.admin.createAssignment({
         teacherId: aTeacher,
-        gradeId: aGrade,
+        gradeIds: aGrades,
         subjectId: aSubject,
         academicYearId: aAy,
       });
-      toast.success("Assignment created");
+      const skipped = requested - created;
+      const msg =
+        skipped > 0
+          ? `Created ${created} assignment(s); ${skipped} already existed`
+          : `Created ${created} assignment${created === 1 ? "" : "s"}`;
+      toast.success(msg);
       setShowAssignDialog(false);
       setATeacher("");
-      setAGrade("");
+      setAGrades([]);
       setASubject("");
       loadAssignments();
     } catch (e) {
@@ -387,6 +393,12 @@ export function SuperadminDashboard({ user }: Props) {
     } finally {
       setSavingAssign(false);
     }
+  }
+
+  function toggleGrade(id: string) {
+    setAGrades((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    );
   }
 
   async function removeAssignment(id: string) {
@@ -1284,17 +1296,54 @@ export function SuperadminDashboard({ user }: Props) {
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Grade</Label>
-              <Select value={aGrade} onValueChange={setAGrade}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  {grades.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>{g.displayName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Grades</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAGrades(grades.map((g) => g.id))}
+                    className="text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAGrades([])}
+                    className="text-[11px] font-medium text-slate-500 hover:text-slate-700"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-4">
+                {grades.map((g) => (
+                  <label
+                    key={g.id}
+                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition ${
+                      aGrades.includes(g.id)
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Checkbox
+                      checked={aGrades.includes(g.id)}
+                      onCheckedChange={() => toggleGrade(g.id)}
+                    />
+                    <span className="font-medium">{g.displayName}</span>
+                  </label>
+                ))}
+                {grades.length === 0 && (
+                  <p className="col-span-full py-2 text-center text-xs text-slate-400">
+                    No grades configured.
+                  </p>
+                )}
+              </div>
+              {aGrades.length > 0 && (
+                <p className="text-[11px] text-slate-500">
+                  {aGrades.length} grade{aGrades.length === 1 ? "" : "s"} selected —
+                  one assignment will be created per grade.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Subject</Label>

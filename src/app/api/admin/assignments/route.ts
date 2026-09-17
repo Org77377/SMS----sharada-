@@ -24,21 +24,58 @@ export async function POST(req: NextRequest) {
   const check = requireRole(session.payload, ROLES.SUPERADMIN);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   const body = await req.json();
-  const { teacherId, gradeId, subjectId, academicYearId } = body;
-  if (!teacherId || !gradeId || !subjectId || !academicYearId) {
-    return NextResponse.json({ error: "teacherId, gradeId, subjectId, academicYearId required" }, { status: 400 });
+  const { teacherId, subjectId, academicYearId } = body;
+  // Accept either a single gradeId (legacy) or a gradeIds array (multi-grade).
+  // Normalize to an array.
+  let gradeIds: string[] = [];
+  if (Array.isArray(body.gradeIds)) {
+    gradeIds = body.gradeIds.filter((g: unknown) => typeof g === "string" && g);
+  } else if (body.gradeId) {
+    gradeIds = [body.gradeId];
+  }
+  if (!teacherId || gradeIds.length === 0 || !subjectId || !academicYearId) {
+    return NextResponse.json(
+      { error: "teacherId, gradeIds (or gradeId), subjectId, academicYearId required" },
+      { status: 400 }
+    );
   }
   try {
-    const a = await db.teacherAssignment.create({
-      data: { teacherId, gradeId, subjectId, academicYearId },
-      include: { teacher: { select: { name: true } }, grade: true, subject: true },
+    // Create all assignments; skip duplicates (ones that already exist for
+    // the same teacher+grade+subject+year) so re-running is idempotent.
+    // We loop with create() + catch instead of createMany({skipDuplicates})
+    // because skipDuplicates is not supported on all Prisma providers.
+    let created = 0;
+    for (const gradeId of gradeIds) {
+      try {
+        await db.teacherAssignment.create({
+          data: { teacherId, gradeId, subjectId, academicYearId },
+        });
+        created++;
+      } catch {
+        // duplicate (compound unique constraint) — skip silently
+      }
+    }
+    // Load the staff member + grade names for the audit log
+    const teacher = await db.user.findUnique({ where: { id: teacherId }, select: { name: true } });
+    const gradeRecords = await db.grade.findMany({
+      where: { id: { in: gradeIds } },
+      select: { displayName: true },
+      orderBy: { gradeNumber: "asc" },
     });
+    const gradeNames = gradeRecords.map((g) => g.displayName).join(", ");
     await db.auditLog.create({
-      data: { actorId: session.payload.userId, action: "ASSIGN_CREATE", detail: `Assigned ${a.teacher.name} → ${a.grade.displayName}/${a.subject.name}` },
+      data: {
+        actorId: session.payload.userId,
+        action: "ASSIGN_CREATE",
+        detail: `Assigned ${teacher?.name ?? teacherId} → ${gradeNames} / ${created} new assignment(s)`,
+      },
     });
-    return NextResponse.json({ assignment: a }, { status: 201 });
+    return NextResponse.json(
+      { created, requested: gradeIds.length },
+      { status: 201 }
+    );
   } catch (e) {
-    return NextResponse.json({ error: "Assignment already exists or invalid: " + (e as Error).message }, { status: 409 });
+    return NextResponse.json({ error: "Failed to create assignments: " + (e as Error).message }, { status: 409 });
   }
 }
 
