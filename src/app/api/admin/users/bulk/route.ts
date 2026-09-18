@@ -10,6 +10,8 @@ interface CsvRow {
   username: string;
   password: string;
   role: string;
+  phone?: string;
+  email?: string;
   department?: string;
   active?: string;
 }
@@ -67,13 +69,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Detect header row. Required columns: name, username, password, role.
-  // Optional: department, active.
+  // Optional: phone, email, department, active.
   const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
   const required = ["name", "username", "password", "role"];
   const missing = required.filter((r) => !header.includes(r));
   if (missing.length > 0) {
     return NextResponse.json(
-      { error: `Missing required columns: ${missing.join(", ")}. Expected: name, username, password, role, department, active` },
+      { error: `Missing required columns: ${missing.join(", ")}. Expected: name, username, password, role, phone, email, department, active` },
       { status: 400 }
     );
   }
@@ -88,6 +90,8 @@ export async function POST(req: NextRequest) {
       username: cells[colIndex["username"]] ?? "",
       password: cells[colIndex["password"]] ?? "",
       role: cells[colIndex["role"]] ?? "",
+      phone: colIndex["phone"] !== undefined ? cells[colIndex["phone"]] : "",
+      email: colIndex["email"] !== undefined ? cells[colIndex["email"]] : "",
       department: colIndex["department"] !== undefined ? cells[colIndex["department"]] : "",
       active: colIndex["active"] !== undefined ? cells[colIndex["active"]] : "",
     });
@@ -164,6 +168,8 @@ export async function POST(req: NextRequest) {
     const active = activeVal === "" ? true : !(activeVal === "false" || activeVal === "no" || activeVal === "0" || activeVal === "inactive");
 
     try {
+      const phone = (r.phone || "").trim();
+      const email = (r.email || "").trim().toLowerCase();
       await db.user.create({
         data: {
           name,
@@ -172,6 +178,8 @@ export async function POST(req: NextRequest) {
           roleId: roleRecord.id,
           active,
           departmentId: role === ROLES.HOD ? departmentId : null,
+          phone: phone || null,
+          email: email || null,
         },
       });
       existingUsernames.add(username);

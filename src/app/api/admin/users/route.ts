@@ -17,6 +17,8 @@ export async function GET() {
       id: u.id,
       name: u.name,
       username: u.username,
+      phone: u.phone ?? null,
+      email: u.email ?? null,
       role: u.role.name,
       roleId: u.roleId,
       active: u.active,
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 
   const body = await req.json();
-  const { name, username, password, roleName, active, departmentId } = body;
+  const { name, username, password, roleName, active, departmentId, phone, email } = body;
   if (!name || !username || !password || !roleName) {
     return NextResponse.json({ error: "name, username, password, roleName required" }, { status: 400 });
   }
@@ -52,6 +54,8 @@ export async function POST(req: NextRequest) {
       roleId: role.id,
       active: active ?? true,
       departmentId: departmentId || null,
+      phone: phone ? String(phone).trim() : null,
+      email: email ? String(email).trim().toLowerCase() : null,
     },
     include: { role: true, department: true },
   });
@@ -59,6 +63,6 @@ export async function POST(req: NextRequest) {
     data: { actorId: session.payload.userId, action: "USER_CREATE", detail: `Created user ${user.username} (${role.name})` },
   });
   return NextResponse.json({
-    user: { id: user.id, name: user.name, username: user.username, role: user.role.name, active: user.active, createdAt: user.createdAt, departmentId: user.departmentId, departmentName: user.department?.name ?? null },
+    user: { id: user.id, name: user.name, username: user.username, phone: user.phone, email: user.email, role: user.role.name, active: user.active, createdAt: user.createdAt, departmentId: user.departmentId, departmentName: user.department?.name ?? null },
   }, { status: 201 });
 }

@@ -10,6 +10,8 @@ export interface AuthUser {
   role: Role;
   roleId: string;
   active: boolean;
+  phone?: string | null;
+  email?: string | null;
   departmentId?: string | null;
   departmentName?: string | null;
 }
@@ -175,7 +177,7 @@ export const api = {
   admin: {
     users: () =>
       request<{ users: (AuthUser & { createdAt: string })[] }>("/api/admin/users"),
-    createUser: (body: { name: string; username: string; password: string; roleName: Role; active?: boolean }) =>
+    createUser: (body: { name: string; username: string; password: string; roleName: Role; active?: boolean; departmentId?: string; phone?: string; email?: string }) =>
       request<{ user: AuthUser }>("/api/admin/users", { method: "POST", body: JSON.stringify(body) }),
     updateUser: (id: string, body: Record<string, unknown>) =>
       request<{ user: AuthUser }>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),

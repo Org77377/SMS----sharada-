@@ -91,6 +91,8 @@ async function main() {
       username: "superadmin",
       passwordHash: defaultPassword,
       roleId: roles[ROLES.SUPERADMIN].id,
+      phone: "+91 90000 00001",
+      email: "superadmin@sharadaschool.edu.in",
       active: true,
     },
   });
@@ -103,6 +105,8 @@ async function main() {
       username: "principal",
       passwordHash: defaultPassword,
       roleId: roles[ROLES.PRINCIPAL].id,
+      phone: "+91 90000 00002",
+      email: "principal@sharadaschool.edu.in",
       active: true,
     },
   });
@@ -117,6 +121,8 @@ async function main() {
       passwordHash: defaultPassword,
       roleId: roles[ROLES.HOD].id,
       departmentId: depts["Science & Mathematics"].id,
+      phone: "+91 90000 00003",
+      email: "hod.sci.math@sharadaschool.edu.in",
       active: true,
     },
   });
@@ -129,6 +135,8 @@ async function main() {
       username: "examcoord",
       passwordHash: defaultPassword,
       roleId: roles[ROLES.EXAM_COORDINATOR].id,
+      phone: "+91 90000 00004",
+      email: "examcoord@sharadaschool.edu.in",
       active: true,
     },
   });
@@ -136,27 +144,29 @@ async function main() {
 
   // Teachers with assignments. password: sharada123 for all.
   const teachers = [
-    { name: "Omkar RG", username: "omkar", subject: "Computer Science", grades: [6, 7, 8, 9, 10] },
-    { name: "Lakshmi Joshi", username: "lakshmi", subject: "Mathematics", grades: [4, 5, 6] },
-    { name: "Ramesh Kulkarni", username: "ramesh", subject: "Science", grades: [7, 8, 9] },
-    { name: "Geeta Nadagouda", username: "geeta", subject: "English", grades: [4, 5, 6, 7] },
-    { name: "Suresh Hiremath", username: "suresh", subject: "Social Science", grades: [8, 9, 10] },
-    { name: "Anita Bommanahalli", username: "anita", subject: "Kannada", grades: [5, 6, 7, 8] },
-    { name: "Vijay Mahantesh", username: "vijay", subject: "Hindi", grades: [4, 5, 6] },
-    { name: "Padma Athani", username: "padma", subject: "Mathematics", grades: [7, 8, 9, 10] },
-    { name: "Nagaraj Badami", username: "nagaraj", subject: "Science", grades: [4, 5, 6] },
-    { name: "Shobha Ilkal", username: "shobha", subject: "Computer Science", grades: [4, 5] },
+    { name: "Omkar RG", username: "omkar", subject: "Computer Science", grades: [6, 7, 8, 9, 10], phone: "+91 98765 43210", email: "omkar.rg@sharadaschool.edu.in" },
+    { name: "Lakshmi Joshi", username: "lakshmi", subject: "Mathematics", grades: [4, 5, 6], phone: "+91 98765 43211", email: "lakshmi.j@sharadaschool.edu.in" },
+    { name: "Ramesh Kulkarni", username: "ramesh", subject: "Science", grades: [7, 8, 9], phone: "+91 98765 43212", email: "ramesh.k@sharadaschool.edu.in" },
+    { name: "Geeta Nadagouda", username: "geeta", subject: "English", grades: [4, 5, 6, 7], phone: "+91 98765 43213", email: "geeta.n@sharadaschool.edu.in" },
+    { name: "Suresh Hiremath", username: "suresh", subject: "Social Science", grades: [8, 9, 10], phone: "+91 98765 43214", email: "suresh.h@sharadaschool.edu.in" },
+    { name: "Anita Bommanahalli", username: "anita", subject: "Kannada", grades: [5, 6, 7, 8], phone: "+91 98765 43215", email: "anita.b@sharadaschool.edu.in" },
+    { name: "Vijay Mahantesh", username: "vijay", subject: "Hindi", grades: [4, 5, 6], phone: "+91 98765 43216", email: "vijay.m@sharadaschool.edu.in" },
+    { name: "Padma Athani", username: "padma", subject: "Mathematics", grades: [7, 8, 9, 10], phone: "+91 98765 43217", email: "padma.a@sharadaschool.edu.in" },
+    { name: "Nagaraj Badami", username: "nagaraj", subject: "Science", grades: [4, 5, 6], phone: "+91 98765 43218", email: "nagaraj.b@sharadaschool.edu.in" },
+    { name: "Shobha Ilkal", username: "shobha", subject: "Computer Science", grades: [4, 5], phone: "+91 98765 43219", email: "shobha.i@sharadaschool.edu.in" },
   ];
 
   for (const t of teachers) {
     const user = await db.user.upsert({
       where: { username: t.username },
-      update: { name: t.name, roleId: roles[ROLES.TEACHER].id },
+      update: { name: t.name, roleId: roles[ROLES.TEACHER].id, phone: t.phone, email: t.email },
       create: {
         name: t.name,
         username: t.username,
         passwordHash: defaultPassword,
         roleId: roles[ROLES.TEACHER].id,
+        phone: t.phone,
+        email: t.email,
         active: true,
       },
     });

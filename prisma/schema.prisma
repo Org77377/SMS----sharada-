@@ -30,6 +30,8 @@ model User {
   name         String
   username     String   @unique
   passwordHash String
+  phone        String?  // mobile number
+  email        String?  // email address
   roleId       String
   role         Role     @relation(fields: [roleId], references: [id])
   departmentId String?  // for HODs — which department they head

@@ -38,6 +38,8 @@ export async function GET() {
       role: roleName,
       roleId: user!.roleId,
       active: user!.active,
+      phone: user!.phone ?? null,
+      email: user!.email ?? null,
       departmentId: user!.departmentId ?? null,
       departmentName: user!.department?.name ?? null,
     },

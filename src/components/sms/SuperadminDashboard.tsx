@@ -99,6 +99,8 @@ export function SuperadminDashboard({ user }: Props) {
   const [uPassword, setUPassword] = useState("");
   const [uRole, setURole] = useState<Role>("Teacher");
   const [uActive, setUActive] = useState(true);
+  const [uPhone, setUPhone] = useState("");
+  const [uEmail, setUEmail] = useState("");
   const [savingUser, setSavingUser] = useState(false);
   const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -236,6 +238,8 @@ export function SuperadminDashboard({ user }: Props) {
     setUPassword("");
     setURole("Teacher");
     setUActive(true);
+    setUPhone("");
+    setUEmail("");
     setUDepartmentId("");
     setCreatedCreds(null);
     setShowUserDialog(true);
@@ -248,6 +252,8 @@ export function SuperadminDashboard({ user }: Props) {
     setUPassword("");
     setURole(u.role);
     setUActive(u.active);
+    setUPhone(u.phone ?? "");
+    setUEmail(u.email ?? "");
     setUDepartmentId(u.departmentId ?? "");
     setCreatedCreds(null);
     setShowUserDialog(true);
@@ -285,6 +291,8 @@ export function SuperadminDashboard({ user }: Props) {
           name: uName.trim(),
           roleName: uRole,
           active: uActive,
+          phone: uPhone.trim() || null,
+          email: uEmail.trim() || null,
         };
         if (uPassword) body.password = uPassword;
         if (uRole === "HOD") body.departmentId = uDepartmentId || null;
@@ -298,6 +306,8 @@ export function SuperadminDashboard({ user }: Props) {
           password: uPassword,
           roleName: uRole,
           active: uActive,
+          phone: uPhone.trim() || undefined,
+          email: uEmail.trim() || undefined,
           departmentId: uRole === "HOD" ? (uDepartmentId || undefined) : undefined,
         });
         toast.success("User created");
@@ -377,10 +387,10 @@ export function SuperadminDashboard({ user }: Props) {
   }
 
   function downloadCsvTemplate() {
-    const template = `name,username,password,role,department,active
-Ravi Kumar,ravi,ravi123,Teacher,,true
-Sneha Patil,sneha,sneha123,HOD,Languages,true
-Amit Shah,amit,amit123,Exam Coordinator,,true`;
+    const template = `name,username,password,role,phone,email,department,active
+Ravi Kumar,ravi,ravi123,Teacher,+91 98765 43210,ravi@sharadaschool.edu.in,,true
+Sneha Patil,sneha,sneha123,HOD,+91 98765 43211,sneha@sharadaschool.edu.in,Languages,true
+Amit Shah,amit,amit123,Exam Coordinator,+91 98765 43212,amit@sharadaschool.edu.in,,true`;
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1269,6 +1279,25 @@ Amit Shah,amit,amit123,Exam Coordinator,,true`;
                 )}
               </div>
             </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mobile number</Label>
+                <Input
+                  value={uPhone}
+                  onChange={(e) => setUPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Email</Label>
+                <Input
+                  type="email"
+                  value={uEmail}
+                  onChange={(e) => setUEmail(e.target.value)}
+                  placeholder="name@sharadaschool.edu.in"
+                />
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Role</Label>
               <Select value={uRole} onValueChange={(v) => setURole(v as Role)}>
@@ -1575,7 +1604,7 @@ Amit Shah,amit,amit123,Exam Coordinator,,true`;
             <DialogDescription>
               Upload or paste a CSV with one user per row. Required columns:
               <span className="font-semibold"> name, username, password, role</span>.
-              Optional: <span className="font-semibold">department, active</span>.
+              Optional: <span className="font-semibold">phone, email, department, active</span>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1602,7 +1631,7 @@ Amit Shah,amit,amit123,Exam Coordinator,,true`;
               <Label className="text-xs">CSV content</Label>
               <textarea
                 className="sms-scroll h-40 w-full rounded-md border border-slate-200 p-3 font-mono text-xs"
-                placeholder={"name,username,password,role,department,active\nRavi Kumar,ravi,ravi123,Teacher,,true"}
+                placeholder={"name,username,password,role,phone,email,department,active\nRavi Kumar,ravi,ravi123,Teacher,+91 98765 43210,ravi@sharadaschool.edu.in,,true"}
                 value={csvText}
                 onChange={(e) => { setCsvText(e.target.value); setImportResult(null); }}
               />
@@ -1616,6 +1645,8 @@ Amit Shah,amit,amit123,Exam Coordinator,,true`;
                 <li><b>username</b> — unique login id (e.g. "ravi")</li>
                 <li><b>password</b> — initial password (e.g. "ravi123")</li>
                 <li><b>role</b> — one of: Teacher, HOD, Exam Coordinator, Principal, Superadmin</li>
+                <li><b>phone</b> — mobile number (optional, e.g. "+91 98765 43210")</li>
+                <li><b>email</b> — email address (optional, e.g. "name@sharadaschool.edu.in")</li>
                 <li><b>department</b> — required only for HOD (must match an existing department name)</li>
                 <li><b>active</b> — true / false (optional, defaults to true)</li>
               </ul>

@@ -34,6 +34,12 @@ export async function PATCH(
       data.departmentId = body.departmentId;
     }
   }
+  if (body.phone !== undefined) {
+    data.phone = body.phone ? String(body.phone).trim() : null;
+  }
+  if (body.email !== undefined) {
+    data.email = body.email ? String(body.email).trim().toLowerCase() : null;
+  }
   if (body.password) {
     data.passwordHash = await hashPassword(body.password);
   }
@@ -46,6 +52,8 @@ export async function PATCH(
       id: updated.id,
       name: updated.name,
       username: updated.username,
+      phone: updated.phone,
+      email: updated.email,
       role: updated.role.name,
       active: updated.active,
       departmentId: updated.departmentId,
