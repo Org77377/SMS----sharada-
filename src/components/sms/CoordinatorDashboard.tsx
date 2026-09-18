@@ -58,7 +58,7 @@ interface Props {
   user: AuthUser;
 }
 
-export function CoordinatorDashboard({ user: _user }: Props) {
+export function CoordinatorDashboard({ user }: Props) {
   const [tab, setTab] = useState("overview");
 
   // ---- Overview ----
@@ -870,6 +870,7 @@ export function CoordinatorDashboard({ user: _user }: Props) {
                       <SelectItem value="Teacher">All Teachers</SelectItem>
                       <SelectItem value="HOD">All HODs</SelectItem>
                       <SelectItem value="Exam Coordinator">All Exam Coordinators</SelectItem>
+                      <SelectItem value="Technical Admin">All Technical Admins</SelectItem>
                       <SelectItem value="Principal">Principal</SelectItem>
                     </SelectContent>
                   </Select>

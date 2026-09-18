@@ -67,6 +67,7 @@ const ROLES_LIST: Role[] = [
   "Principal",
   "HOD",
   "Exam Coordinator",
+  "Technical Admin",
   "Teacher",
 ];
 
@@ -1644,7 +1645,7 @@ Amit Shah,amit,amit123,Exam Coordinator,+91 98765 43212,amit@sharadaschool.edu.i
                 <li><b>name</b> — Full name (e.g. "Ravi Kumar")</li>
                 <li><b>username</b> — unique login id (e.g. "ravi")</li>
                 <li><b>password</b> — initial password (e.g. "ravi123")</li>
-                <li><b>role</b> — one of: Teacher, HOD, Exam Coordinator, Principal, Superadmin</li>
+                <li><b>role</b> — one of: Teacher, HOD, Exam Coordinator, Principal, Technical Admin, Superadmin</li>
                 <li><b>phone</b> — mobile number (optional, e.g. "+91 98765 43210")</li>
                 <li><b>email</b> — email address (optional, e.g. "name@sharadaschool.edu.in")</li>
                 <li><b>department</b> — required only for HOD (must match an existing department name)</li>

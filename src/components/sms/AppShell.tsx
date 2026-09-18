@@ -1,6 +1,7 @@
 "use client";
 
-import { GraduationCap, Bell, LogOut, Menu } from "lucide-react";
+import { useState } from "react";
+import { GraduationCap, Bell, KeyRound, LogOut, Menu, UserCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   DropdownMenu,
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { AuthUser, Role } from "@/lib/api";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
 interface AppShellProps {
   user: AuthUser;
@@ -33,6 +35,17 @@ const ROLE_BADGE: Record<Role, string> = {
   Teacher: "bg-emerald-100 text-emerald-700",
 };
 
+// Roles that can change their own password from the portal.
+// (Superadmin can reset others' passwords directly from the Users tab.)
+const SELF_PASSWORD_ROLES: Role[] = [
+  "Principal",
+  "HOD",
+  "Exam Coordinator",
+  "Technical Admin",
+  "Teacher",
+  "Superadmin",
+];
+
 export function AppShell({
   user,
   unreadCount,
@@ -41,12 +54,15 @@ export function AppShell({
   children,
   rightSlot,
 }: AppShellProps) {
+  const [pwOpen, setPwOpen] = useState(false);
   const initials = user.name
     .split(" ")
     .map((n) => n[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
+
+  const canChangePassword = SELF_PASSWORD_ROLES.includes(user.role);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -119,6 +135,22 @@ export function AppShell({
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {canChangePassword && (
+                  <DropdownMenuItem onClick={() => setPwOpen(true)}>
+                    <KeyRound className="mr-2 h-4 w-4" /> Change Password
+                  </DropdownMenuItem>
+                )}
+                {user.phone && (
+                  <div className="px-2 py-1.5 text-xs text-slate-500">
+                    <span className="font-medium">Phone:</span> {user.phone}
+                  </div>
+                )}
+                {user.email && (
+                  <div className="px-2 py-1.5 text-xs text-slate-500">
+                    <span className="font-medium">Email:</span> {user.email}
+                  </div>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-rose-600 focus:text-rose-600"
                   onClick={onLogout}
@@ -150,6 +182,9 @@ export function AppShell({
           </p>
         </div>
       </footer>
+
+      {/* Change password dialog (available to all self-service roles) */}
+      <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
     </div>
   );
 }
