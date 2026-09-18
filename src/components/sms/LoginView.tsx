@@ -177,7 +177,7 @@ export function LoginView({ onLogin }: { onLogin: (user: AuthUser) => void }) {
                 </Button>
               </form>
 
-              <div className="mt-6 border-t border-slate-100 pt-4">
+              {/* <div className="mt-6 border-t border-slate-100 pt-4">
                 <p className="mb-2 text-center text-xs font-medium text-slate-400">
                   Demo accounts · password{" "}
                   <span className="font-mono text-slate-600">sharada123</span>
@@ -199,7 +199,7 @@ export function LoginView({ onLogin }: { onLogin: (user: AuthUser) => void }) {
                     </button>
                   ))}
                 </div>
-              </div>
+              </div> */}
 
               {/* Mobile-only credit (hidden on lg where hero shows it) */}
               <p className="mt-6 text-center text-[11px] font-light text-slate-400 lg:hidden">
