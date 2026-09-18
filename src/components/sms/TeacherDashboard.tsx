@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BookPlus,
@@ -75,6 +75,10 @@ export function TeacherDashboard({ user }: Props) {
   // Reject feedback view
   const [feedbackUnit, setFeedbackUnit] = useState<Unit | null>(null);
 
+  // Track whether selectedGradeId was explicitly set (by user or first load)
+  // so we don't overwrite it on re-mounts / HMR.
+  const gradeInitializedRef = useRef(false);
+
   // subject derived from assignment
   const currentAssignment = useMemo(
     () => assignments.find((a) => a.gradeId === selectedGradeId),
@@ -86,7 +90,10 @@ export function TeacherDashboard({ user }: Props) {
     try {
       const { assignments } = await api.myAssignments();
       setAssignments(assignments);
-      if (assignments.length > 0 && !selectedGradeId) {
+      // Only auto-select the first grade on the very first load.
+      // If the user (or a previous mount) already selected a grade, keep it.
+      if (assignments.length > 0 && !gradeInitializedRef.current) {
+        gradeInitializedRef.current = true;
         setSelectedGradeId(assignments[0].gradeId);
       }
     } catch (e) {
@@ -120,6 +127,19 @@ export function TeacherDashboard({ user }: Props) {
   useEffect(() => {
     loadUnits();
   }, [loadUnits]);
+
+  // Warn the user if they have unsaved form data and try to close/refresh the tab.
+  // This prevents accidental data loss without any auto-refresh.
+  const hasUnsavedForm = unitName.trim() !== "" || topics.trim() !== "" || objectives.trim() !== "";
+  useEffect(() => {
+    function beforeUnloadHandler(e: BeforeUnloadEvent) {
+      if (!hasUnsavedForm) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, [hasUnsavedForm]);
 
   async function handleAddUnit(submit: boolean) {
     if (!selectedGradeId || !currentAssignment) {
