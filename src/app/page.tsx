@@ -7,6 +7,7 @@ import { LoginView } from "@/components/sms/LoginView";
 import { TeacherDashboard } from "@/components/sms/TeacherDashboard";
 import { CoordinatorDashboard } from "@/components/sms/CoordinatorDashboard";
 import { SuperadminDashboard } from "@/components/sms/SuperadminDashboard";
+import { TechnicalAdminDashboard } from "@/components/sms/TechnicalAdminDashboard";
 import { NotificationPanel } from "@/components/sms/NotificationPanel";
 import {
   api,
@@ -205,6 +206,7 @@ export default function Home() {
       rightSlot={rightSlot}
     >
       {user.role === "Teacher" && <TeacherDashboard user={user} />}
+      {user.role === "Technical Admin" && <TechnicalAdminDashboard user={user} />}
       {isReviewerRole &&
         (reviewerView === "submission" && canSubmitSyllabus ? (
           <TeacherDashboard user={user} />

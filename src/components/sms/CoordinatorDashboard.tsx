@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   Download,
   FileText,
@@ -47,6 +48,7 @@ import {
   formatDate,
   type AuthUser,
   type CompiledDoc,
+  type PendingAction,
   type StatusCell,
   type Unit,
 } from "@/lib/api";
@@ -86,6 +88,13 @@ export function CoordinatorDashboard({ user: _user }: Props) {
   const [bMessage, setBMessage] = useState("");
   const [bTarget, setBTarget] = useState<string>("Teacher");
   const [broadcasting, setBroadcasting] = useState(false);
+
+  // Approvals tab (Principal sees pending Technical Admin requests)
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [reviewingAction, setReviewingAction] = useState<PendingAction | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewing, setReviewing] = useState(false);
 
   const loadGrid = useCallback(async () => {
     setLoadingGrid(true);
@@ -412,6 +421,55 @@ export function CoordinatorDashboard({ user: _user }: Props) {
     }
   }
 
+  // ---- Approvals (Principal reviews Technical Admin requests) ----
+  const loadPending = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const { actions } = await api.admin.pendingActions();
+      setPendingActions(actions);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "approvals") loadPending();
+  }, [tab, loadPending]);
+
+  async function handleApproveAction() {
+    if (!reviewingAction) return;
+    setReviewing(true);
+    try {
+      await api.admin.approvePendingAction(reviewingAction.id, reviewNote.trim() || undefined);
+      toast.success("Approved & executed");
+      setReviewingAction(null);
+      setReviewNote("");
+      loadPending();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setReviewing(false);
+    }
+  }
+
+  async function handleRejectAction() {
+    if (!reviewingAction) return;
+    setReviewing(true);
+    try {
+      await api.admin.rejectPendingAction(reviewingAction.id, reviewNote.trim() || undefined);
+      toast.success("Request rejected");
+      setReviewingAction(null);
+      setReviewNote("");
+      loadPending();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setReviewing(false);
+    }
+  }
+
   // grid helpers
   const gradesInGrid = useMemo(
     () => Array.from(new Set(grid.map((c) => c.gradeNumber))).sort((a, b) => a - b),
@@ -476,6 +534,16 @@ export function CoordinatorDashboard({ user: _user }: Props) {
           <TabsTrigger value="broadcast" className="gap-1.5">
             <Megaphone className="h-4 w-4" /> Broadcast
           </TabsTrigger>
+          {user.role === "Principal" && (
+            <TabsTrigger value="approvals" className="gap-1.5 relative">
+              <ClipboardCheck className="h-4 w-4" /> Approvals
+              {pendingActions.filter((a) => a.status === "PENDING").length > 0 && (
+                <span className="ml-1 grid h-4 min-w-4 place-items-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  {pendingActions.filter((a) => a.status === "PENDING").length}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
         </ScrollArea>
 
@@ -861,6 +929,125 @@ export function CoordinatorDashboard({ user: _user }: Props) {
             </Card>
           </div>
         </TabsContent>
+
+        {/* APPROVALS (Principal only) */}
+        {user.role === "Principal" && (
+          <TabsContent value="approvals" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <ClipboardCheck className="h-4 w-4 text-slate-400" /> Approval Requests
+                </h2>
+                <p className="text-xs text-slate-500">Technical Admin change requests — review &amp; approve to execute.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={loadPending} disabled={loadingPending}>
+                <RefreshCw className={`h-4 w-4 ${loadingPending ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+            {pendingActions.length === 0 ? (
+              <Card className="border-dashed border-slate-300 p-10 text-center">
+                <ClipboardCheck className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-3 text-sm text-slate-500">No approval requests.</p>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {pendingActions.map((a) => {
+                  let preview: Record<string, unknown> = {};
+                  try { preview = JSON.parse(a.actionData); } catch { /* */ }
+                  return (
+                    <Card key={a.id} className="border-slate-200/70 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-0">
+                              {a.actionType === "USER_CREATE" ? "Create Teacher" : a.actionType === "USER_UPDATE" ? "Edit Teacher" : "Delete Teacher"}
+                            </Badge>
+                            {a.targetName && <span className="text-sm font-medium text-slate-800">{a.targetName}</span>}
+                            {a.status === "PENDING" && (
+                              <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-0">Pending</Badge>
+                            )}
+                            {a.status === "APPROVED" && (
+                              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-0">Approved</Badge>
+                            )}
+                            {a.status === "REJECTED" && (
+                              <Badge variant="secondary" className="bg-rose-50 text-rose-700 border-0">Rejected</Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Requested by {a.requesterName} · {formatDate(a.createdAt)}
+                            {a.reviewerName && ` · Reviewed by ${a.reviewerName}`}
+                          </p>
+                          {/* Preview proposed data */}
+                          {Object.keys(preview).length > 0 && (
+                            <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-[11px] text-slate-600">
+                              {Object.entries(preview).filter(([k]) => k !== "password").map(([k, v]) => (
+                                <span key={k} className="mr-3">
+                                  <span className="font-medium text-slate-700">{k}:</span> {String(v || "—")}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {a.reviewerNote && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              <span className="font-medium">Note:</span> {a.reviewerNote}
+                            </p>
+                          )}
+                        </div>
+                        {a.status === "PENDING" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            onClick={() => { setReviewingAction(a); setReviewNote(""); }}
+                          >
+                            <ClipboardCheck className="mr-1 h-3.5 w-3.5" /> Review
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Review dialog */}
+            <Dialog open={!!reviewingAction} onOpenChange={(o) => !o && setReviewingAction(null)}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Review request</DialogTitle>
+                  <DialogDescription>
+                    {reviewingAction?.actionType === "USER_CREATE" ? "Create teacher" :
+                     reviewingAction?.actionType === "USER_UPDATE" ? `Edit teacher: ${reviewingAction?.targetName}` :
+                     `Delete teacher: ${reviewingAction?.targetName}`}
+                    {" — approve to execute the change."}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2 py-2">
+                  <Label className="text-xs">Note (optional)</Label>
+                  <Textarea
+                    rows={3}
+                    placeholder="Add a note for the Technical Admin…"
+                    value={reviewNote}
+                    onChange={(e) => setReviewNote(e.target.value)}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setReviewingAction(null); setReviewNote(""); }}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleRejectAction} disabled={reviewing} className="bg-rose-600 hover:bg-rose-700">
+                    {reviewing && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                    Reject
+                  </Button>
+                  <Button onClick={handleApproveAction} disabled={reviewing} className="bg-emerald-600 hover:bg-emerald-700">
+                    {reviewing && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                    Approve &amp; Execute
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Reject dialog */}

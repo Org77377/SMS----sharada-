@@ -142,6 +142,22 @@ async function main() {
   });
   console.log("✓ Admin / Principal / HOD / Exam Coordinator users");
 
+  // Technical Admin — restricted admin; proposes teacher changes (needs Principal approval)
+  await db.user.upsert({
+    where: { username: "techadmin" },
+    update: { name: "Tech Admin", roleId: roles[ROLES.TECHNICAL_ADMIN].id },
+    create: {
+      name: "Tech Admin",
+      username: "techadmin",
+      passwordHash: defaultPassword,
+      roleId: roles[ROLES.TECHNICAL_ADMIN].id,
+      phone: "+91 90000 00005",
+      email: "techadmin@sharadaschool.edu.in",
+      active: true,
+    },
+  });
+  console.log("✓ Technical Admin user");
+
   // Teachers with assignments. password: sharada123 for all.
   const teachers = [
     { name: "Omkar RG", username: "omkar", subject: "Computer Science", grades: [6, 7, 8, 9, 10], phone: "+91 98765 43210", email: "omkar.rg@sharadaschool.edu.in" },
@@ -273,7 +289,7 @@ async function main() {
 
   console.log("\n=== Seed complete ===");
   console.log("Login credentials (password for all): sharada123");
-  console.log("  superadmin / principal / coordinator / examcoord / omkar / lakshmi / ramesh ...");
+  console.log("  superadmin / principal / coordinator / examcoord / techadmin / omkar / lakshmi / ramesh ...");
 }
 
 main()

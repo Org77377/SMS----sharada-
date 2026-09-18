@@ -1,6 +1,6 @@
 // Frontend API helpers + shared types
 
-export type Role = "Superadmin" | "Principal" | "HOD" | "Exam Coordinator" | "Teacher";
+export type Role = "Superadmin" | "Principal" | "HOD" | "Exam Coordinator" | "Technical Admin" | "Teacher";
 export type UnitStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
 export interface AuthUser {
@@ -32,6 +32,22 @@ export interface Department {
   name: string;
   subjectCount: number;
   hodCount: number;
+}
+
+export interface PendingAction {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  actionType: "USER_CREATE" | "USER_UPDATE" | "USER_DELETE";
+  targetUserId: string | null;
+  targetName: string | null;
+  actionData: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  reviewerId: string | null;
+  reviewerName: string | null;
+  reviewerNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
 }
 
 export interface Unit {
@@ -254,6 +270,23 @@ export const api = {
       ),
     deleteDepartment: (id: string) =>
       request<{ ok: true }>(`/api/admin/departments?id=${id}`, { method: "DELETE" }),
+    pendingActions: () =>
+      request<{ actions: PendingAction[] }>("/api/admin/pending-actions"),
+    createPendingAction: (body: { actionType: string; targetUserId?: string; actionData: string }) =>
+      request<{ action: unknown }>("/api/admin/pending-actions", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    approvePendingAction: (id: string, note?: string) =>
+      request<{ ok: true }>(`/api/admin/pending-actions/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ note: note || "" }),
+      }),
+    rejectPendingAction: (id: string, note?: string) =>
+      request<{ ok: true }>(`/api/admin/pending-actions/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ note: note || "" }),
+      }),
   },
 };
 

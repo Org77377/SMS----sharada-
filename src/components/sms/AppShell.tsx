@@ -29,6 +29,7 @@ const ROLE_BADGE: Record<Role, string> = {
   Principal: "bg-blue-100 text-blue-700",
   HOD: "bg-cyan-100 text-cyan-700",
   "Exam Coordinator": "bg-teal-100 text-teal-700",
+  "Technical Admin": "bg-indigo-100 text-indigo-700",
   Teacher: "bg-emerald-100 text-emerald-700",
 };
 

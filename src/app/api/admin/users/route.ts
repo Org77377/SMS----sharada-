@@ -6,7 +6,7 @@ import { hashPassword, ROLES, REVIEWER_ROLES } from "@/lib/auth";
 export async function GET() {
   const session = await getCurrentUserWithRole();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const check = requireRole(session.payload, ROLES.SUPERADMIN, ROLES.PRINCIPAL, ...REVIEWER_ROLES);
+  const check = requireRole(session.payload, ROLES.SUPERADMIN, ROLES.PRINCIPAL, ROLES.TECHNICAL_ADMIN, ...REVIEWER_ROLES);
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
   const users = await db.user.findMany({
     include: { role: true, department: true },

@@ -15,7 +15,8 @@ export async function GET(
     session.payload,
     ...REVIEWER_ROLES,
     ROLES.PRINCIPAL,
-    ROLES.SUPERADMIN
+    ROLES.SUPERADMIN,
+    ROLES.TECHNICAL_ADMIN
   );
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 

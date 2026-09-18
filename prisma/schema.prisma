@@ -11,7 +11,7 @@ datasource db {
 
 model Role {
   id        String   @id @default(cuid())
-  name      String   @unique // Superadmin | Principal | HOD | Exam Coordinator | Teacher
+  name      String   @unique // Superadmin | Principal | HOD | Exam Coordinator | Technical Admin | Teacher
   users     User[]
   notifications Notification[]
   createdAt DateTime @default(now())
@@ -44,6 +44,27 @@ model User {
   units            Unit[]
   sentNotifications Notification[] @relation("NotificationSender")
   receivedNotifications Notification[] @relation("NotificationRecipient")
+  pendingActionsRequested PendingAction[] @relation("PendingActionRequester")
+  pendingActionsReviewed  PendingAction[] @relation("PendingActionReviewer")
+}
+
+// Pending actions proposed by Technical Admin, requiring Principal approval.
+// Stores the proposed change payload; executed only when the Principal approves.
+model PendingAction {
+  id           String   @id @default(cuid())
+  requesterId  String   // Technical Admin who proposed
+  actionType   String   // "USER_CREATE" | "USER_UPDATE" | "USER_DELETE"
+  targetUserId String?  // for UPDATE/DELETE — the teacher being changed
+  targetName   String?  // snapshot of the target user's name for display
+  actionData   String   // JSON string of the proposed change payload
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewerId   String?
+  reviewerNote String?
+  createdAt    DateTime @default(now())
+  reviewedAt   DateTime?
+
+  requester  User   @relation("PendingActionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  reviewer   User?  @relation("PendingActionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
 }
 
 model Grade {

@@ -42,6 +42,7 @@ export const ROLES = {
   PRINCIPAL: "Principal",
   HOD: "HOD",
   EXAM_COORDINATOR: "Exam Coordinator",
+  TECHNICAL_ADMIN: "Technical Admin",
   TEACHER: "Teacher",
 } as const;
 
