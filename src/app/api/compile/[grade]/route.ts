@@ -83,6 +83,12 @@ export async function GET(
     return { subject: s.subject, teacherName, terms };
   });
 
+  // Determine the display title based on the selected term
+  const termDisplay =
+    !termFilter ? "Annual Syllabus" :
+    termFilter === "Mid-Term" ? "Mid-Term Syllabus" :
+    `${termFilter} Syllabus`;
+
   return NextResponse.json({
     school: {
       name: "Sharada Public School",
@@ -91,7 +97,7 @@ export async function GET(
     },
     academicYear: ay.year,
     grade: { number: grade.gradeNumber, displayName: grade.displayName },
-    term: termFilter || "All Terms",
+    term: termDisplay,
     generatedAt: new Date().toISOString(),
     subjects,
   });
