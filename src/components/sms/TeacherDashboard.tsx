@@ -76,13 +76,11 @@ export function TeacherDashboard({ user }: Props) {
   const [loadingUnits, setLoadingUnits] = useState(false);
 
   // New unit form
-  const [unitName, setUnitName] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([{ chapter: "", topics: "" }]);
   const [saving, setSaving] = useState(false);
 
   // Edit dialog
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
-  const [editName, setEditName] = useState("");
   const [editChapters, setEditChapters] = useState<Chapter[]>([{ chapter: "", topics: "" }]);
   const [editSaving, setEditSaving] = useState(false);
 
@@ -143,7 +141,6 @@ export function TeacherDashboard({ user }: Props) {
 
   // Warn the user if they have unsaved form data and try to close/refresh the tab.
   const hasUnsavedForm =
-    unitName.trim() !== "" ||
     chapters.some((c) => c.chapter.trim() !== "" || c.topics.trim() !== "");
   useEffect(() => {
     function beforeUnloadHandler(e: BeforeUnloadEvent) {
@@ -184,14 +181,16 @@ export function TeacherDashboard({ user }: Props) {
     setEditChapters(editChapters.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
   }
 
+  // Auto-generate a unit name from the first chapter.
+  function genUnitName(chs: Chapter[]): string {
+    const first = chs.find((c) => c.chapter.trim());
+    return first ? first.chapter.trim() : "Untitled Unit";
+  }
+
   // ---- Actions ----
   async function handleAddUnit(submit: boolean) {
     if (!selectedGradeId || !currentAssignment) {
       toast.error("Select a grade first");
-      return;
-    }
-    if (!unitName.trim()) {
-      toast.error("Unit name is required");
       return;
     }
     const valid = chapters.filter((c) => c.chapter.trim() || c.topics.trim());
@@ -199,18 +198,18 @@ export function TeacherDashboard({ user }: Props) {
       toast.error("Add at least one chapter with a name or topics");
       return;
     }
+    const autoName = genUnitName(valid);
     setSaving(true);
     try {
       const { unit } = await api.createUnit({
         gradeId: selectedGradeId,
         subjectId: currentAssignment.subjectId,
         term: selectedTerm,
-        unitName: unitName.trim(),
+        unitName: autoName,
         chapters: valid,
         status: submit ? "SUBMITTED" : "DRAFT",
       } as Record<string, unknown>);
       setUnits((prev) => [...prev, unit].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
-      setUnitName("");
       setChapters([{ chapter: "", topics: "" }]);
       toast.success(
         submit
@@ -253,26 +252,22 @@ export function TeacherDashboard({ user }: Props) {
 
   function openEdit(u: Unit) {
     setEditingUnit(u);
-    setEditName(u.unitName);
     const parsed = parseChapters(u.chapters);
     setEditChapters(parsed.length > 0 ? parsed : [{ chapter: "", topics: "" }]);
   }
 
   async function saveEdit() {
     if (!editingUnit) return;
-    if (!editName.trim()) {
-      toast.error("Unit name is required");
-      return;
-    }
     const valid = editChapters.filter((c) => c.chapter.trim() || c.topics.trim());
     if (valid.length === 0) {
       toast.error("Add at least one chapter");
       return;
     }
+    const autoName = genUnitName(valid);
     setEditSaving(true);
     try {
       const { unit } = await api.updateUnit(editingUnit.id, {
-        unitName: editName.trim(),
+        unitName: autoName,
         chapters: valid,
       });
       setUnits((prev) => prev.map((u) => (u.id === unit.id ? unit : u)));
@@ -426,18 +421,6 @@ export function TeacherDashboard({ user }: Props) {
             </div>
           </div>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="unitName" className="text-xs font-medium text-slate-600">
-                Unit / Chapter Name <span className="text-rose-500">*</span>
-              </Label>
-              <Input
-                id="unitName"
-                placeholder="e.g. Computer Fundamentals"
-                value={unitName}
-                onChange={(e) => setUnitName(e.target.value)}
-              />
-            </div>
-
             {/* Chapters + Topics rows */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -671,10 +654,6 @@ export function TeacherDashboard({ user }: Props) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Unit / Chapter Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">
