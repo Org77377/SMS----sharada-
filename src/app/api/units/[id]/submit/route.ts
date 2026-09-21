@@ -21,45 +21,62 @@ export async function POST(
   if (unit.status === UNIT_STATUS.APPROVED)
     return NextResponse.json({ error: "Already approved" }, { status: 400 });
 
+  // HODs, Exam Coordinators, Principals → auto-approve on submit (no waiting).
+  // Teachers → SUBMITTED (awaits review).
+  const isAutoApprove = session.payload.role !== ROLES.TEACHER;
+  const newStatus = isAutoApprove ? UNIT_STATUS.APPROVED : UNIT_STATUS.SUBMITTED;
+
   const updated = await db.unit.update({
     where: { id },
-    data: { status: UNIT_STATUS.SUBMITTED, feedback: null },
+    data: { status: newStatus, feedback: null },
     include: { grade: true, subject: true, createdBy: { select: { name: true } } },
   });
   await db.auditLog.create({
-    data: { actorId: session.payload.userId, action: "UNIT_SUBMIT", detail: `Submitted unit "${unit.unitName}"` },
+    data: {
+      actorId: session.payload.userId,
+      action: isAutoApprove ? "UNIT_AUTO_APPROVE" : "UNIT_SUBMIT",
+      detail: `${isAutoApprove ? "Auto-approved" : "Submitted"} unit "${unit.unitName}"`,
+    },
   });
 
-  // Notify reviewers: the HOD of the subject's department (if any),
-  // all Exam Coordinators, and the Principal.
-  const subject = await db.subject.findUnique({
-    where: { id: unit.subjectId },
-    select: { departmentId: true },
-  });
-  // Build an OR filter: Exam Coordinator + Principal always notified;
-  // HOD only if they belong to the subject's department (or any HOD if
-  // the subject has no department assigned yet).
-  const orConditions: { role: { name: string }; departmentId?: string | null }[] = [
-    { role: { name: ROLES.EXAM_COORDINATOR } },
-    { role: { name: ROLES.PRINCIPAL } },
-  ];
-  if (subject?.departmentId) {
-    orConditions.push({ role: { name: ROLES.HOD }, departmentId: subject.departmentId });
+  // Only notify reviewers when a TEACHER submits (HOD/EC/Principal auto-approve)
+  if (!isAutoApprove) {
+    const subject = await db.subject.findUnique({
+      where: { id: unit.subjectId },
+      select: { departmentId: true },
+    });
+    const orConditions: { role: { name: string }; departmentId?: string | null }[] = [
+      { role: { name: ROLES.EXAM_COORDINATOR } },
+      { role: { name: ROLES.PRINCIPAL } },
+    ];
+    if (subject?.departmentId) {
+      orConditions.push({ role: { name: ROLES.HOD }, departmentId: subject.departmentId });
+    } else {
+      orConditions.push({ role: { name: ROLES.HOD } });
+    }
+    const reviewers = await db.user.findMany({
+      where: { OR: orConditions, active: true },
+    });
+    if (reviewers.length > 0) {
+      await db.notification.createMany({
+        data: reviewers.map((r) => ({
+          senderId: session.payload.userId,
+          recipientId: r.id,
+          title: "New syllabus submission",
+          message: `${session.payload.name} submitted "${unit.unitName}" for review.`,
+        })),
+      });
+    }
   } else {
-    orConditions.push({ role: { name: ROLES.HOD } });
-  }
-  const reviewers = await db.user.findMany({
-    where: { OR: orConditions, active: true },
-  });
-  if (reviewers.length > 0) {
-    await db.notification.createMany({
-      data: reviewers.map((r) => ({
+    // Notify the submitter that their unit was auto-approved
+    await db.notification.create({
+      data: {
         senderId: session.payload.userId,
-        recipientId: r.id,
-        title: "New syllabus submission",
-        message: `${session.payload.name} submitted "${unit.unitName}" for review.`,
-      })),
+        recipientId: session.payload.userId,
+        title: "Unit auto-approved",
+        message: `Your unit "${unit.unitName}" was auto-approved (you are an HOD/Coordinator). It's now visible in the compiled syllabus.`,
+      },
     });
   }
-  return NextResponse.json({ unit: updated });
+  return NextResponse.json({ unit: updated, autoApproved: isAutoApprove });
 }

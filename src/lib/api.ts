@@ -50,6 +50,11 @@ export interface PendingAction {
   reviewedAt: string | null;
 }
 
+export interface Chapter {
+  chapter: string;
+  topics: string;
+}
+
 export interface Unit {
   id: string;
   gradeId: string;
@@ -57,8 +62,7 @@ export interface Unit {
   academicYearId: string;
   term: string;
   unitName: string;
-  topics: string;
-  learningObjectives: string | null;
+  chapters: string; // JSON-encoded array of Chapter
   status: UnitStatus;
   feedback: string | null;
   createdById: string;
@@ -110,7 +114,7 @@ export interface CompiledSubject {
   teacherName: string;
   terms: {
     term: string;
-    units: { id: string; unitName: string; topics: string; learningObjectives: string }[];
+    units: { id: string; unitName: string; chapters: string }[];
   }[];
 }
 export interface CompiledDoc {

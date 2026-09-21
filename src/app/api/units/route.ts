@@ -61,10 +61,29 @@ export async function POST(req: NextRequest) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: 403 });
 
   const body = await req.json();
-  const { gradeId, subjectId, term, unitName, topics, learningObjectives, status } = body;
-  if (!gradeId || !subjectId || !term || !unitName || !topics) {
+  const { gradeId, subjectId, term, unitName, chapters, status } = body;
+  if (!gradeId || !subjectId || !term || !unitName) {
     return NextResponse.json(
-      { error: "Grade, subject, term, unit name and topics are required" },
+      { error: "Grade, subject, term and unit name are required" },
+      { status: 400 }
+    );
+  }
+  // chapters: array of { chapter, topics }
+  const chaptersArray = Array.isArray(chapters) ? chapters : [];
+  if (chaptersArray.length === 0) {
+    return NextResponse.json(
+      { error: "Add at least one chapter with topics" },
+      { status: 400 }
+    );
+  }
+  // Sanitize: max 10 chapters, each with chapter + topics strings
+  const sanitizedChapters = chaptersArray.slice(0, 10).map((c: { chapter?: unknown; topics?: unknown }) => ({
+    chapter: String(c.chapter || "").trim(),
+    topics: String(c.topics || "").trim(),
+  })).filter((c: { chapter: string; topics: string }) => c.chapter || c.topics);
+  if (sanitizedChapters.length === 0) {
+    return NextResponse.json(
+      { error: "Add at least one chapter with a name or topics" },
       { status: 400 }
     );
   }
@@ -89,6 +108,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // HODs, Exam Coordinators, Principals → auto-approve on submit.
+  // Teachers → go through the normal approval flow.
+  const finalStatus =
+    status === UNIT_STATUS.SUBMITTED
+      ? (session.payload.role === ROLES.TEACHER
+          ? UNIT_STATUS.SUBMITTED
+          : UNIT_STATUS.APPROVED)
+      : UNIT_STATUS.DRAFT;
+
   try {
     const unit = await db.unit.create({
       data: {
@@ -97,15 +125,14 @@ export async function POST(req: NextRequest) {
         academicYearId: ay.id,
         term,
         unitName: unitName.trim(),
-        topics: topics.trim(),
-        learningObjectives: learningObjectives?.trim() || null,
-        status: status === UNIT_STATUS.SUBMITTED ? UNIT_STATUS.SUBMITTED : UNIT_STATUS.DRAFT,
+        chapters: JSON.stringify(sanitizedChapters),
+        status: finalStatus,
         createdById: session.payload.userId,
       },
       include: { grade: true, subject: true, createdBy: { select: { name: true } } },
     });
     await db.auditLog.create({
-      data: { actorId: session.payload.userId, action: "UNIT_CREATE", detail: `Created unit "${unit.unitName}" (${unit.grade.displayName} / ${unit.subject.name} / ${term})` },
+      data: { actorId: session.payload.userId, action: "UNIT_CREATE", detail: `Created unit "${unit.unitName}" (${unit.grade.displayName} / ${unit.subject.name} / ${term}) — ${finalStatus}` },
     });
     return NextResponse.json({ unit }, { status: 201 });
   } catch (e) {

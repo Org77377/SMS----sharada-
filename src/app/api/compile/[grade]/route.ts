@@ -38,7 +38,9 @@ export async function GET(
   const where = {
     gradeId: grade.id,
     academicYearId: ay.id,
-    status: "APPROVED",
+    // Show all SUBMITTED and APPROVED units in the compiled syllabus.
+    // (DRAFT and REJECTED are excluded — they're not ready for parents.)
+    status: { in: ["SUBMITTED", "APPROVED"] },
     subject: subjectFilter,
     ...(termFilter ? { term: termFilter } : {}),
   };
@@ -74,8 +76,7 @@ export async function GET(
           units: list.map((u) => ({
             id: u.id,
             unitName: u.unitName,
-            topics: u.topics,
-            learningObjectives: u.learningObjectives || "",
+            chapters: u.chapters,
           })),
         };
       });

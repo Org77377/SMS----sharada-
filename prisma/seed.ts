@@ -209,7 +209,7 @@ async function main() {
   }
   console.log(`✓ ${teachers.length} teachers with assignments`);
 
-  // Sample submitted units for a teacher (Omkar - Computer Science, Grade 8, Term 1)
+  // Sample submitted units for a teacher (Omkar - Computer Science, Grade 8)
   const omkar = await db.user.findUnique({ where: { username: "omkar" } });
   const csSubject = allSubjects.find((s) => s.name === "Computer Science")!;
   if (omkar) {
@@ -220,10 +220,11 @@ async function main() {
         academicYearId: ay.id,
         term: "Term 1",
         unitName: "Computer Fundamentals",
-        topics:
-          "History of computers; Generations of computers; Characteristics and limitations; Basic architecture (Input, Process, Output, Storage); Types of memory (RAM, ROM, Cache).",
-        learningObjectives:
-          "Identify the generations of computers; Explain the basic architecture; Differentiate between RAM and ROM.",
+        chapters: JSON.stringify([
+          { chapter: "History of Computers", topics: "Generations, characteristics, abacus to modern computers" },
+          { chapter: "Computer Architecture", topics: "Input, Process, Output, Storage; CPU, ALU, Control Unit" },
+          { chapter: "Memory", topics: "RAM, ROM, Cache, Secondary storage" },
+        ]),
         status: "SUBMITTED",
         createdById: omkar.id,
       },
@@ -235,10 +236,11 @@ async function main() {
         academicYearId: ay.id,
         term: "Term 1",
         unitName: "Operating Systems & Windows",
-        topics:
-          "Definition and functions of an OS; Types of OS; Desktop, icons, taskbar; File and folder management; Control panel basics.",
-        learningObjectives:
-          "State functions of an OS; Manage files and folders; Use the control panel.",
+        chapters: JSON.stringify([
+          { chapter: "Operating System Basics", topics: "Definition, functions, types of OS, booting" },
+          { chapter: "Windows Desktop", topics: "Desktop, icons, taskbar, start menu, control panel" },
+          { chapter: "File Management", topics: "Files, folders, creating, copying, moving, deleting" },
+        ]),
         status: "APPROVED",
         createdById: omkar.id,
       },
@@ -250,13 +252,15 @@ async function main() {
         academicYearId: ay.id,
         term: "Term 1",
         unitName: "Word Processing (MS Word)",
-        topics:
-          "Introduction to word processing; Creating, saving, opening documents; Formatting text; Tables and images; Page layout and printing.",
+        chapters: JSON.stringify([
+          { chapter: "Introduction to Word Processing", topics: "Creating, saving, opening documents" },
+          { chapter: "Formatting", topics: "Text, paragraphs, lists, tables, images" },
+        ]),
         status: "DRAFT",
         createdById: omkar.id,
       },
     });
-    // Term 2 approved unit so "All Terms" shows both Term 1 and Term 2
+    // Term 2 unit so "All Terms" shows both Term 1 and Term 2
     await db.unit.create({
       data: {
         gradeId: grades[8].id,
@@ -264,10 +268,11 @@ async function main() {
         academicYearId: ay.id,
         term: "Term 2",
         unitName: "HTML & CSS Basics",
-        topics:
-          "HTML structure and tags; Attributes and hyperlinks; Lists, tables and forms; CSS selectors and properties; Inline vs block elements; Box model and spacing.",
-        learningObjectives:
-          "Build a simple webpage using HTML; Apply basic CSS styling; Understand the box model.",
+        chapters: JSON.stringify([
+          { chapter: "HTML Structure", topics: "Tags, attributes, elements, headings, paragraphs" },
+          { chapter: "Links & Lists", topics: "Hyperlinks, ordered/unordered lists, images" },
+          { chapter: "CSS Basics", topics: "Selectors, properties, colors, fonts, box model" },
+        ]),
         status: "APPROVED",
         createdById: omkar.id,
       },

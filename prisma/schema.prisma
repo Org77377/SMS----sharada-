@@ -118,8 +118,9 @@ model Unit {
   academicYearId     String
   term               String   // "Term 1" | "Term 2"
   unitName           String
-  topics            String
-  learningObjectives String?
+  // chapters is a JSON-encoded array of { chapter: string, topics: string }
+  // e.g. [{"chapter":"Algebra","topics":"Equations, Polynomials"}]
+  chapters           String   @default("[]")
   status             String   @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REJECTED
   feedback           String?
   createdById        String
