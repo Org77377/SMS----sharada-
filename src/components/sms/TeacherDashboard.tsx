@@ -8,12 +8,14 @@ import {
   FileEdit,
   Loader2,
   Pencil,
+  Plus,
   PlusCircle,
   Send,
   Trash2,
   X,
   ClipboardList,
   GraduationCap,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,7 @@ import {
   formatDate,
   type Assignment,
   type AuthUser,
+  type Chapter,
   type Unit,
   type UnitStatus,
 } from "@/lib/api";
@@ -50,6 +53,19 @@ import {
 interface Props {
   user: AuthUser;
 }
+
+// Parse the JSON-encoded chapters string into an array.
+function parseChapters(raw: string): Chapter[] {
+  try {
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return arr as Chapter[];
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+const MAX_CHAPTERS = 10;
 
 export function TeacherDashboard({ user }: Props) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -61,23 +77,22 @@ export function TeacherDashboard({ user }: Props) {
 
   // New unit form
   const [unitName, setUnitName] = useState("");
-  const [topics, setTopics] = useState("");
-  const [objectives, setObjectives] = useState("");
+  const [chapters, setChapters] = useState<Chapter[]>([{ chapter: "", topics: "" }]);
   const [saving, setSaving] = useState(false);
 
   // Edit dialog
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [editName, setEditName] = useState("");
-  const [editTopics, setEditTopics] = useState("");
-  const [editObjectives, setEditObjectives] = useState("");
+  const [editChapters, setEditChapters] = useState<Chapter[]>([{ chapter: "", topics: "" }]);
   const [editSaving, setEditSaving] = useState(false);
 
   // Reject feedback view
   const [feedbackUnit, setFeedbackUnit] = useState<Unit | null>(null);
 
   // Track whether selectedGradeId was explicitly set (by user or first load)
-  // so we don't overwrite it on re-mounts / HMR.
   const gradeInitializedRef = useRef(false);
+
+  const isStaffRole = user.role !== "Teacher"; // HOD/EC/Principal can edit any + auto-approve
 
   // subject derived from assignment
   const currentAssignment = useMemo(
@@ -90,8 +105,6 @@ export function TeacherDashboard({ user }: Props) {
     try {
       const { assignments } = await api.myAssignments();
       setAssignments(assignments);
-      // Only auto-select the first grade on the very first load.
-      // If the user (or a previous mount) already selected a grade, keep it.
       if (assignments.length > 0 && !gradeInitializedRef.current) {
         gradeInitializedRef.current = true;
         setSelectedGradeId(assignments[0].gradeId);
@@ -129,8 +142,9 @@ export function TeacherDashboard({ user }: Props) {
   }, [loadUnits]);
 
   // Warn the user if they have unsaved form data and try to close/refresh the tab.
-  // This prevents accidental data loss without any auto-refresh.
-  const hasUnsavedForm = unitName.trim() !== "" || topics.trim() !== "" || objectives.trim() !== "";
+  const hasUnsavedForm =
+    unitName.trim() !== "" ||
+    chapters.some((c) => c.chapter.trim() !== "" || c.topics.trim() !== "");
   useEffect(() => {
     function beforeUnloadHandler(e: BeforeUnloadEvent) {
       if (!hasUnsavedForm) return;
@@ -141,13 +155,48 @@ export function TeacherDashboard({ user }: Props) {
     return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
   }, [hasUnsavedForm]);
 
+  // ---- Chapter row helpers ----
+  function addChapter() {
+    if (chapters.length >= MAX_CHAPTERS) {
+      toast.warning(`Maximum ${MAX_CHAPTERS} chapters per unit`);
+      return;
+    }
+    setChapters([...chapters, { chapter: "", topics: "" }]);
+  }
+  function removeChapter(idx: number) {
+    setChapters(chapters.filter((_, i) => i !== idx));
+  }
+  function updateChapter(idx: number, field: keyof Chapter, value: string) {
+    setChapters(chapters.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+  }
+
+  function addEditChapter() {
+    if (editChapters.length >= MAX_CHAPTERS) {
+      toast.warning(`Maximum ${MAX_CHAPTERS} chapters per unit`);
+      return;
+    }
+    setEditChapters([...editChapters, { chapter: "", topics: "" }]);
+  }
+  function removeEditChapter(idx: number) {
+    setEditChapters(editChapters.filter((_, i) => i !== idx));
+  }
+  function updateEditChapter(idx: number, field: keyof Chapter, value: string) {
+    setEditChapters(editChapters.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+  }
+
+  // ---- Actions ----
   async function handleAddUnit(submit: boolean) {
     if (!selectedGradeId || !currentAssignment) {
       toast.error("Select a grade first");
       return;
     }
-    if (!unitName.trim() || !topics.trim()) {
-      toast.error("Unit name and topics are required");
+    if (!unitName.trim()) {
+      toast.error("Unit name is required");
+      return;
+    }
+    const valid = chapters.filter((c) => c.chapter.trim() || c.topics.trim());
+    if (valid.length === 0) {
+      toast.error("Add at least one chapter with a name or topics");
       return;
     }
     setSaving(true);
@@ -157,15 +206,19 @@ export function TeacherDashboard({ user }: Props) {
         subjectId: currentAssignment.subjectId,
         term: selectedTerm,
         unitName: unitName.trim(),
-        topics: topics.trim(),
-        learningObjectives: objectives.trim() || undefined,
+        chapters: valid,
         status: submit ? "SUBMITTED" : "DRAFT",
-      });
+      } as Record<string, unknown>);
       setUnits((prev) => [...prev, unit].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
       setUnitName("");
-      setTopics("");
-      setObjectives("");
-      toast.success(submit ? "Unit submitted for review" : "Draft saved");
+      setChapters([{ chapter: "", topics: "" }]);
+      toast.success(
+        submit
+          ? isStaffRole
+            ? "Unit submitted & auto-approved ✓"
+            : "Unit submitted for review"
+          : "Draft saved"
+      );
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -174,16 +227,21 @@ export function TeacherDashboard({ user }: Props) {
   }
 
   async function handleSubmitUnit(id: string) {
+    const btn = document.querySelector(`[data-submit-id="${id}"]`) as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
     try {
-      const { unit } = await api.submitUnit(id);
+      const { unit, autoApproved } = await api.submitUnit(id) as { unit: Unit; autoApproved?: boolean };
       setUnits((prev) => prev.map((u) => (u.id === id ? unit : u)));
-      toast.success("Submitted for approval");
+      toast.success(autoApproved ? "Auto-approved (you are an HOD/Coordinator)" : "Submitted for approval");
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
   async function handleDeleteUnit(id: string) {
+    if (!confirm("Delete this unit? This cannot be undone.")) return;
     try {
       await api.deleteUnit(id);
       setUnits((prev) => prev.filter((u) => u.id !== id));
@@ -196,18 +254,26 @@ export function TeacherDashboard({ user }: Props) {
   function openEdit(u: Unit) {
     setEditingUnit(u);
     setEditName(u.unitName);
-    setEditTopics(u.topics);
-    setEditObjectives(u.learningObjectives || "");
+    const parsed = parseChapters(u.chapters);
+    setEditChapters(parsed.length > 0 ? parsed : [{ chapter: "", topics: "" }]);
   }
 
   async function saveEdit() {
     if (!editingUnit) return;
+    if (!editName.trim()) {
+      toast.error("Unit name is required");
+      return;
+    }
+    const valid = editChapters.filter((c) => c.chapter.trim() || c.topics.trim());
+    if (valid.length === 0) {
+      toast.error("Add at least one chapter");
+      return;
+    }
     setEditSaving(true);
     try {
       const { unit } = await api.updateUnit(editingUnit.id, {
         unitName: editName.trim(),
-        topics: editTopics.trim(),
-        learningObjectives: editObjectives.trim() || null,
+        chapters: valid,
       });
       setUnits((prev) => prev.map((u) => (u.id === unit.id ? unit : u)));
       setEditingUnit(null);
@@ -231,7 +297,6 @@ export function TeacherDashboard({ user }: Props) {
   }, [units]);
 
   const subjects = useMemo(() => {
-    // unique subject names from assignments
     const map = new Map<string, string>();
     for (const a of assignments) map.set(a.subject.name, a.subject.name);
     return Array.from(map.values());
@@ -252,6 +317,11 @@ export function TeacherDashboard({ user }: Props) {
           {subjects.length > 0 && (
             <Badge className="bg-emerald-100 text-emerald-700 border-0">
               {subjects.join(" · ")}
+            </Badge>
+          )}
+          {isStaffRole && (
+            <Badge className="bg-blue-100 text-blue-700 border-0">
+              Auto-approve on submit
             </Badge>
           )}
         </div>
@@ -297,9 +367,7 @@ export function TeacherDashboard({ user }: Props) {
             >
               <SelectTrigger className="h-10">
                 <SelectValue
-                  placeholder={
-                    loadingAssignments ? "Loading..." : "Select grade"
-                  }
+                  placeholder={loadingAssignments ? "Loading..." : "Select grade"}
                 />
               </SelectTrigger>
               <SelectContent>
@@ -369,34 +437,67 @@ export function TeacherDashboard({ user }: Props) {
                 onChange={(e) => setUnitName(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="topics" className="text-xs font-medium text-slate-600">
-                Topics Covered <span className="text-rose-500">*</span>
-              </Label>
-              <Textarea
-                id="topics"
-                rows={4}
-                placeholder="Comma or line-separated list of topics..."
-                value={topics}
-                onChange={(e) => setTopics(e.target.value)}
-              />
+
+            {/* Chapters + Topics rows */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium text-slate-600">
+                  Chapters & Topics{" "}
+                  <span className="font-normal text-slate-400">
+                    ({chapters.length}/{MAX_CHAPTERS})
+                  </span>
+                </Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-blue-600 hover:bg-blue-50"
+                  onClick={addChapter}
+                  disabled={chapters.length >= MAX_CHAPTERS}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Chapter
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {chapters.map((ch, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-lg border border-slate-200 bg-slate-50/50 p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+                        <GripVertical className="h-3 w-3" />
+                        Chapter {idx + 1}
+                      </span>
+                      {chapters.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeChapter(idx)}
+                          className="text-rose-400 hover:text-rose-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <Input
+                        placeholder="Chapter name"
+                        value={ch.chapter}
+                        onChange={(e) => updateChapter(idx, "chapter", e.target.value)}
+                        className="bg-white"
+                      />
+                      <Input
+                        placeholder="Topics (comma-separated)"
+                        value={ch.topics}
+                        onChange={(e) => updateChapter(idx, "topics", e.target.value)}
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="objectives"
-                className="text-xs font-medium text-slate-600"
-              >
-                Learning Objectives{" "}
-                <span className="font-normal text-slate-400">(optional)</span>
-              </Label>
-              <Textarea
-                id="objectives"
-                rows={3}
-                placeholder="What students should achieve by the end of this unit..."
-                value={objectives}
-                onChange={(e) => setObjectives(e.target.value)}
-              />
-            </div>
+
             <div className="flex gap-2 pt-1">
               <Button
                 variant="outline"
@@ -421,7 +522,7 @@ export function TeacherDashboard({ user }: Props) {
                 ) : (
                   <Send className="mr-1 h-4 w-4" />
                 )}
-                Submit
+                {isStaffRole ? "Submit" : "Submit"}
               </Button>
             </div>
           </div>
@@ -455,17 +556,103 @@ export function TeacherDashboard({ user }: Props) {
           ) : (
             <div className="space-y-3">
               <AnimatePresence initial={false}>
-                {units.map((u, idx) => (
-                  <UnitCard
-                    key={u.id}
-                    unit={u}
-                    index={idx}
-                    onSubmit={() => handleSubmitUnit(u.id)}
-                    onDelete={() => handleDeleteUnit(u.id)}
-                    onEdit={() => openEdit(u)}
-                    onViewFeedback={() => setFeedbackUnit(u)}
-                  />
-                ))}
+                {units.map((u, idx) => {
+                  const unitChapters = parseChapters(u.chapters);
+                  const meta = STATUS_META[u.status as UnitStatus];
+                  const canEdit = isStaffRole || u.status === "DRAFT" || u.status === "REJECTED";
+                  const canDelete = isStaffRole || u.status !== "APPROVED";
+                  return (
+                    <motion.div
+                      key={u.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      transition={{ delay: Math.min(idx * 0.03, 0.2) }}
+                    >
+                      <Card className="border-slate-200/70 p-4 transition hover:shadow-md hover:shadow-slate-200/60">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-sm font-semibold text-slate-900">
+                                {u.unitName}
+                              </h3>
+                              <Badge variant="secondary" className={`${meta.bg} ${meta.color} border-0`}>
+                                <span className={`mr-1 h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+                                {meta.label}
+                              </Badge>
+                              {unitChapters.length > 0 && (
+                                <span className="text-[11px] text-slate-400">
+                                  {unitChapters.length} chapter{unitChapters.length === 1 ? "" : "s"}
+                                </span>
+                              )}
+                            </div>
+                            {/* Chapter preview */}
+                            {unitChapters.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {unitChapters.slice(0, 2).map((ch, ci) => (
+                                  <div key={ci} className="text-xs text-slate-600">
+                                    <span className="font-medium text-slate-700">{ci + 1}. {ch.chapter || "Untitled"}</span>
+                                    {ch.topics && <span className="text-slate-500"> — {ch.topics.length > 60 ? ch.topics.slice(0, 60) + "…" : ch.topics}</span>}
+                                  </div>
+                                ))}
+                                {unitChapters.length > 2 && (
+                                  <p className="text-[11px] text-slate-400">+ {unitChapters.length - 2} more</p>
+                                )}
+                              </div>
+                            )}
+                            {u.status === "REJECTED" && u.feedback && (
+                              <button
+                                onClick={() => setFeedbackUnit(u)}
+                                className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
+                              >
+                                <FileEdit className="h-3 w-3" /> View feedback
+                              </button>
+                            )}
+                            <p className="mt-2 text-[11px] text-slate-400">
+                              Updated {formatDate(u.updatedAt)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {canEdit && (
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEdit(u)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600"
+                                onClick={() => handleDeleteUnit(u.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {(u.status === "DRAFT" || u.status === "REJECTED") && (
+                              <Button
+                                size="sm"
+                                data-submit-id={u.id}
+                                className="h-7 bg-blue-600 text-[11px] hover:bg-blue-700"
+                                onClick={() => handleSubmitUnit(u.id)}
+                              >
+                                <Send className="mr-1 h-3 w-3" /> Submit
+                              </Button>
+                            )}
+                            {u.status === "SUBMITTED" && (
+                              <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-600">
+                                Awaiting review
+                              </span>
+                            )}
+                            {u.status === "APPROVED" && (
+                              <CheckCircle2 className="h-5 w-5 self-end text-emerald-500" />
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
             </div>
           )}
@@ -474,7 +661,7 @@ export function TeacherDashboard({ user }: Props) {
 
       {/* Edit dialog */}
       <Dialog open={!!editingUnit} onOpenChange={(o) => !o && setEditingUnit(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit unit</DialogTitle>
             <DialogDescription>
@@ -488,21 +675,57 @@ export function TeacherDashboard({ user }: Props) {
               <Label className="text-xs">Unit / Chapter Name</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Topics Covered</Label>
-              <Textarea
-                rows={4}
-                value={editTopics}
-                onChange={(e) => setEditTopics(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Learning Objectives</Label>
-              <Textarea
-                rows={3}
-                value={editObjectives}
-                onChange={(e) => setEditObjectives(e.target.value)}
-              />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">
+                  Chapters & Topics ({editChapters.length}/{MAX_CHAPTERS})
+                </Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-blue-600 hover:bg-blue-50"
+                  onClick={addEditChapter}
+                  disabled={editChapters.length >= MAX_CHAPTERS}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Chapter
+                </Button>
+              </div>
+              <div className="sms-scroll max-h-[40vh] space-y-2 overflow-y-auto pr-1">
+                {editChapters.map((ch, idx) => (
+                  <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+                        <GripVertical className="h-3 w-3" />
+                        Chapter {idx + 1}
+                      </span>
+                      {editChapters.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeEditChapter(idx)}
+                          className="text-rose-400 hover:text-rose-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <Input
+                        placeholder="Chapter name"
+                        value={ch.chapter}
+                        onChange={(e) => updateEditChapter(idx, "chapter", e.target.value)}
+                        className="bg-white"
+                      />
+                      <Input
+                        placeholder="Topics (comma-separated)"
+                        value={ch.topics}
+                        onChange={(e) => updateEditChapter(idx, "topics", e.target.value)}
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -538,94 +761,5 @@ export function TeacherDashboard({ user }: Props) {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function UnitCard({
-  unit,
-  index,
-  onSubmit,
-  onDelete,
-  onEdit,
-  onViewFeedback,
-}: {
-  unit: Unit;
-  index: number;
-  onSubmit: () => void;
-  onDelete: () => void;
-  onEdit: () => void;
-  onViewFeedback: () => void;
-}) {
-  const meta = STATUS_META[unit.status as UnitStatus];
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ delay: Math.min(index * 0.03, 0.2) }}
-    >
-      <Card className="border-slate-200/70 p-4 transition hover:shadow-md hover:shadow-slate-200/60">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-900">
-                {unit.unitName}
-              </h3>
-              <Badge variant="secondary" className={`${meta.bg} ${meta.color} border-0`}>
-                <span className={`mr-1 h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-                {meta.label}
-              </Badge>
-            </div>
-            <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-600">
-              {unit.topics}
-            </p>
-            {unit.status === "REJECTED" && unit.feedback && (
-              <button
-                onClick={onViewFeedback}
-                className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
-              >
-                <FileEdit className="h-3 w-3" /> View feedback
-              </button>
-            )}
-            <p className="mt-2 text-[11px] text-slate-400">
-              Updated {formatDate(unit.updatedAt)}
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            {(unit.status === "DRAFT" || unit.status === "REJECTED") && (
-              <>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onEdit}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600"
-                  onClick={onDelete}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-7 bg-blue-600 text-[11px] hover:bg-blue-700"
-                  onClick={onSubmit}
-                >
-                  <Send className="mr-1 h-3 w-3" /> Submit
-                </Button>
-              </>
-            )}
-            {unit.status === "SUBMITTED" && (
-              <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-600">
-                Awaiting review
-              </span>
-            )}
-            {unit.status === "APPROVED" && (
-              <CheckCircle2 className="h-5 w-5 self-end text-emerald-500" />
-            )}
-          </div>
-        </div>
-      </Card>
-    </motion.div>
   );
 }

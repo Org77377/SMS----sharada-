@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
-import type { CompiledDoc } from "@/lib/api";
+import type { Chapter, CompiledDoc } from "@/lib/api";
 
 interface Props {
   doc: CompiledDoc;
@@ -14,20 +14,20 @@ const C = {
   muted: "#64748b",
   faint: "#94a3b8",
   line: "#e2e8f0",
-  surface: "#f1f5f9",
+  surface: "#f8fafc",
   primary: "#2563eb",
   primaryDark: "#1e40af",
   white: "#ffffff",
-  amber: "#fefce8",
-  amberText: "#713f12",
-  amberBorder: "#ca8a04",
 };
 
-function splitTopics(raw: string): string[] {
-  return raw
-    .split(/[\n\r]+|,(?=\s)/)
-    .map((t) => t.replace(/^\s*[-•·*\d.)\]]+\s*/, "").trim())
-    .filter((t) => t.length > 0);
+function parseChapters(raw: string): Chapter[] {
+  try {
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return arr as Chapter[];
+  } catch {
+    /* ignore */
+  }
+  return [];
 }
 
 export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
@@ -136,7 +136,7 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
             {doc.subjects.map((s) => (
               <section
                 key={s.subject.id}
-                style={{ breakInside: "avoid", marginBottom: 24 }}
+                style={{ breakInside: "avoid", marginBottom: 28 }}
               >
                 {/* Subject header bar */}
                 <div
@@ -186,197 +186,143 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
                   )}
                 </div>
 
-                {s.terms.map((t) => (
-                  <div
-                    key={t.term}
-                    style={{ marginBottom: 18, breakInside: "avoid" }}
-                  >
-                    {/* Term label */}
+                {s.terms.map((t) => {
+                  const termUnits = t.units;
+                  if (termUnits.length === 0) return null;
+                  // Collect all chapters across all units of this term into one table
+                  const allChapters: { chapter: string; topics: string; unitName: string }[] = [];
+                  for (const u of termUnits) {
+                    const chs = parseChapters(u.chapters);
+                    for (const ch of chs) {
+                      allChapters.push({
+                        chapter: ch.chapter || "Untitled",
+                        topics: ch.topics || "—",
+                        unitName: u.unitName,
+                      });
+                    }
+                  }
+                  if (allChapters.length === 0) return null;
+                  return (
                     <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 8,
-                        padding: "5px 0",
-                        borderBottom: `2px solid ${C.primary}`,
-                        width: "fit-content",
-                      }}
+                      key={t.term}
+                      style={{ marginBottom: 18, breakInside: "avoid" }}
                     >
-                      <span
+                      {/* Term label */}
+                      <div
                         style={{
-                          display: "inline-block",
-                          width: 8,
-                          height: 8,
-                          borderRadius: 999,
-                          background: C.primary,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.08em",
-                          color: C.primaryDark,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 8,
+                          padding: "5px 0",
+                          borderBottom: `2px solid ${C.primary}`,
+                          width: "fit-content",
                         }}
                       >
-                        {t.term}
-                      </span>
-                    </div>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 8,
+                            height: 8,
+                            borderRadius: 999,
+                            background: C.primary,
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            color: C.primaryDark,
+                          }}
+                        >
+                          {t.term}
+                        </span>
+                      </div>
 
-                    {t.units.length === 0 ? (
-                      <p
+                      {/* 2-column table: Chapter | Topics */}
+                      <table
                         style={{
-                          margin: 0,
-                          padding: "8px 14px",
+                          width: "100%",
+                          borderCollapse: "collapse",
                           fontSize: 12,
-                          fontStyle: "italic",
-                          color: C.faint,
+                          breakInside: "avoid",
                         }}
                       >
-                        No units published for this term.
-                      </p>
-                    ) : (
-                      t.units.map((u, i) => {
-                        const topics = splitTopics(u.topics);
-                        return (
-                          <div
-                            key={u.id}
-                            style={{
-                              breakInside: "avoid",
-                              marginBottom: 14,
-                              border: `1px solid ${C.line}`,
-                              borderRadius: 8,
-                              overflow: "hidden",
-                            }}
-                          >
-                            {/* Unit header */}
-                            <div
+                        <thead>
+                          <tr>
+                            <th
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                padding: "9px 12px",
-                                background: "#eff6ff",
-                                borderBottom: `1px solid ${C.line}`,
+                                textAlign: "left",
+                                padding: "8px 12px",
+                                background: C.primary,
+                                color: C.white,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                borderBottom: `2px solid ${C.primaryDark}`,
                               }}
                             >
-                              <span
+                              Chapter
+                            </th>
+                            <th
+                              style={{
+                                textAlign: "left",
+                                padding: "8px 12px",
+                                background: C.primary,
+                                color: C.white,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                borderBottom: `2px solid ${C.primaryDark}`,
+                              }}
+                            >
+                              Topics
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allChapters.map((ch, ci) => (
+                            <tr
+                              key={ci}
+                              style={{
+                                background: ci % 2 === 0 ? C.surface : C.white,
+                                breakInside: "avoid",
+                              }}
+                            >
+                              <td
                                 style={{
-                                  display: "inline-grid",
-                                  placeItems: "center",
-                                  width: 22,
-                                  height: 22,
-                                  borderRadius: 6,
-                                  background: C.primary,
-                                  color: C.white,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {i + 1}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 700,
+                                  padding: "8px 12px",
+                                  fontWeight: 600,
                                   color: C.ink,
+                                  borderBottom: `1px solid ${C.line}`,
+                                  verticalAlign: "top",
+                                  width: "35%",
                                 }}
                               >
-                                {u.unitName}
-                              </span>
-                            </div>
-                            {/* Unit body */}
-                            <div style={{ padding: "10px 12px" }}>
-                              <span
+                                {ci + 1}. {ch.chapter}
+                              </td>
+                              <td
                                 style={{
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  color: C.muted,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.06em",
+                                  padding: "8px 12px",
+                                  color: C.inkSoft,
+                                  borderBottom: `1px solid ${C.line}`,
+                                  lineHeight: 1.5,
+                                  verticalAlign: "top",
                                 }}
                               >
-                                Topics
-                              </span>
-                              <div
-                                style={{
-                                  marginTop: 8,
-                                  display: "flex",
-                                  flexWrap: "wrap",
-                                  gap: 6,
-                                }}
-                              >
-                                {topics.map((tp, ti) => (
-                                  <span
-                                    key={ti}
-                                    style={{
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 5,
-                                      padding: "3px 9px",
-                                      background: C.surface,
-                                      borderRadius: 999,
-                                      border: `1px solid ${C.line}`,
-                                      fontSize: 11.5,
-                                      lineHeight: 1.4,
-                                      color: C.inkSoft,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: 10,
-                                        fontWeight: 700,
-                                        color: C.primary,
-                                      }}
-                                    >
-                                      {ti + 1}
-                                    </span>
-                                    {tp}
-                                  </span>
-                                ))}
-                              </div>
-                              {u.learningObjectives && (
-                                <div
-                                  style={{
-                                    marginTop: 8,
-                                    padding: "7px 10px",
-                                    background: C.amber,
-                                    borderRadius: 5,
-                                    borderLeft: `3px solid ${C.amberBorder}`,
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      fontWeight: 700,
-                                      color: "#854d0e",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.04em",
-                                    }}
-                                  >
-                                    Objectives
-                                  </span>
-                                  <p
-                                    style={{
-                                      margin: "3px 0 0",
-                                      fontSize: 11.5,
-                                      lineHeight: 1.5,
-                                      color: C.amberText,
-                                    }}
-                                  >
-                                    {u.learningObjectives}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                ))}
+                                {ch.topics}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
               </section>
             ))}
           </div>

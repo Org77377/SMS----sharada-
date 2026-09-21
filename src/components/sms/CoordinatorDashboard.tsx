@@ -184,11 +184,14 @@ export function CoordinatorDashboard({ user }: Props) {
   }
 
   // ---- Export helpers ----
-  function splitTopics(raw: string): string[] {
-    return raw
-      .split(/[\n\r]+|,(?=\s)/)
-      .map((t) => t.replace(/^\s*[-•·*\d.)\]]+\s*/, "").trim())
-      .filter((t) => t.length > 0);
+  function parseChapters(raw: string): { chapter: string; topics: string }[] {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr as { chapter: string; topics: string }[];
+    } catch {
+      /* ignore */
+    }
+    return [];
   }
 
   function buildCompiledHtml(doc: CompiledDoc, headerImage = ""): string {
@@ -200,42 +203,42 @@ export function CoordinatorDashboard({ user }: Props) {
       .map((s) => {
         const terms = s.terms
           .map((t) => {
-            const units =
-              t.units.length === 0
-                ? `<p style="margin:0;padding:8px 14px;font-size:12px;font-style:italic;color:#94a3b8;">No units published for this term.</p>`
-                : t.units
-                    .map((u, i) => {
-                      const topicList = splitTopics(u.topics);
-                      const topicsHtml =
-                        topicList.length === 0
-                          ? ""
-                          : `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${topicList
-                              .map(
-                                (tp, ti) => `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;background:#f1f5f9;border-radius:999px;border:1px solid #e2e8f0;font-size:11.5px;line-height:1.4;color:#334155;"><span style="font-size:10px;font-weight:700;color:#2563eb;">${ti + 1}</span>${escapeHtml(tp)}</span>`
-                              )
-                              .join("")}</div>`;
-                      const objectivesHtml = u.learningObjectives
-                        ? `<div style="margin-top:8px;padding:7px 10px;background:#fefce8;border-radius:5px;border-left:3px solid #ca8a04;"><span style="font-size:11px;font-weight:700;color:#854d0e;text-transform:uppercase;letter-spacing:0.04em;">Objectives</span><p style="margin:3px 0 0;font-size:11.5px;line-height:1.5;color:#713f12;">${escapeHtml(u.learningObjectives)}</p></div>`
-                        : "";
-                      return `<div style="break-inside:avoid;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-                        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#eff6ff;border-bottom:1px solid #e2e8f0;">
-                          <span style="flex:0 0 auto;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;">${i + 1}</span>
-                          <span style="flex:1;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(u.unitName)}</span>
-                        </div>
-                        <div style="padding:10px 12px;">
-                          <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Topics</span>
-                          ${topicsHtml}
-                          ${objectivesHtml}
-                        </div>
-                      </div>`;
-                    })
-                    .join("");
+            if (t.units.length === 0) return "";
+            // Collect all chapters from all units in this term into one table
+            const allChapters: { chapter: string; topics: string }[] = [];
+            for (const u of t.units) {
+              const chs = parseChapters(u.chapters);
+              for (const ch of chs) {
+                allChapters.push({
+                  chapter: ch.chapter || "Untitled",
+                  topics: ch.topics || "—",
+                });
+              }
+            }
+            if (allChapters.length === 0) return "";
+            const rowsHtml = allChapters
+              .map((ch, ci) => {
+                const bg = ci % 2 === 0 ? "#f8fafc" : "#ffffff";
+                return `<tr style="background:${bg};">
+                  <td style="padding:8px 12px;font-weight:600;color:#0f172a;border-bottom:1px solid #e2e8f0;vertical-align:top;width:35%;">${ci + 1}. ${escapeHtml(ch.chapter)}</td>
+                  <td style="padding:8px 12px;color:#334155;border-bottom:1px solid #e2e8f0;line-height:1.5;vertical-align:top;">${escapeHtml(ch.topics)}</td>
+                </tr>`;
+              })
+              .join("");
             return `<div style="margin-bottom:18px;break-inside:avoid;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:5px 0;border-bottom:2px solid #2563eb;width:fit-content;">
                 <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:#2563eb;"></span>
                 <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#1e40af;">${t.term}</span>
               </div>
-              ${units}
+              <table style="width:100%;border-collapse:collapse;font-size:12px;break-inside:avoid;">
+                <thead>
+                  <tr>
+                    <th style="text-align:left;padding:8px 12px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #1e40af;">Chapter</th>
+                    <th style="text-align:left;padding:8px 12px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #1e40af;">Topics</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
             </div>`;
           })
           .join("");
@@ -252,25 +255,17 @@ export function CoordinatorDashboard({ user }: Props) {
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(doc.grade.displayName)} Syllabus</title></head><body style="margin:0;padding:0;font-family:'Inter','Segoe UI',Arial,sans-serif;color:#0f172a;background:#fff;">
 <div style="max-width:760px;margin:0 auto;padding:36px 44px 28px;">
-  <!-- Header image centered with top margin -->
-  <div style="text:center;margin-bottom:0;">
-    ${headerImgTag}
-  </div>
-  <!-- Line after header -->
+  <div style="text-align:center;margin-bottom:0;">${headerImgTag}</div>
   <div style="margin:14px 0 10px;height:2px;background:#2563eb;border-radius:1px;"></div>
-  <!-- Meta row: academic year left, term right -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
     <span style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">Academic Year ${escapeHtml(doc.academicYear)}</span>
     <span style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(doc.term)}</span>
   </div>
-  <!-- Grade title -->
   <div style="text-align:center;margin-bottom:24px;">
     <h2 style="margin:0;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.01em;">${escapeHtml(doc.grade.displayName)} — Annual Syllabus</h2>
     <div style="margin:8px auto 0;width:60px;height:3px;background:#2563eb;border-radius:2px;"></div>
   </div>
-  <!-- Subjects -->
-  <div>${subjects || `<div style="border-radius:10px;border:1px dashed #cbd5e1;padding:36px 16px;text-align:center;font-size:13px;color:#64748b;">No approved syllabus entries have been compiled for this grade yet.</div>`}</div>
-  <!-- Footer -->
+  <div>${subjects || `<div style="border-radius:10px;border:1px dashed #cbd5e1;padding:36px 16px;text-align:center;font-size:13px;color:#64748b;">No syllabus entries have been compiled for this grade yet.</div>`}</div>
   <div style="margin-top:30px;padding-top:14px;border-top:1px solid #e2e8f0;text-align:center;">
     <p style="margin:0;font-size:10px;color:#94a3b8;">This compiled syllabus is auto-generated by the SMS portal of ${escapeHtml(doc.school.name)}, ${escapeHtml(doc.school.city)} ${escapeHtml(doc.school.pin)}.</p>
     <p style="margin:3px 0 0;font-size:10px;color:#94a3b8;">© ${new Date().getFullYear()} · Architected &amp; Developed by Omkar RG | Dept. of CS, Sharada Public School</p>
