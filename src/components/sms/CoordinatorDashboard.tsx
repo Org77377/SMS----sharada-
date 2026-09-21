@@ -226,7 +226,7 @@ export function CoordinatorDashboard({ user }: Props) {
               })
               .join("");
             return `<div style="margin-bottom:18px;break-inside:avoid;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:5px 0;border-bottom:2px solid #2563eb;width:fit-content;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:5px 0;border-bottom:3px solid #1e40af;width:fit-content;">
                 <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:#2563eb;"></span>
                 <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#1e40af;">${t.term}</span>
               </div>
@@ -256,14 +256,14 @@ export function CoordinatorDashboard({ user }: Props) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(doc.grade.displayName)} Syllabus</title></head><body style="margin:0;padding:0;font-family:'Inter','Segoe UI',Arial,sans-serif;color:#0f172a;background:#fff;">
 <div style="max-width:760px;margin:0 auto;padding:36px 44px 28px;">
   <div style="text-align:center;margin-bottom:0;">${headerImgTag}</div>
-  <div style="margin:14px 0 10px;height:2px;background:#2563eb;border-radius:1px;"></div>
+  <div style="margin:14px 0 10px;height:3px;background:#1e40af;border-radius:1px;"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
     <span style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">Academic Year ${escapeHtml(doc.academicYear)}</span>
     <span style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(doc.term)}</span>
   </div>
   <div style="text-align:center;margin-bottom:24px;">
-    <h2 style="margin:0;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.01em;">${escapeHtml(doc.grade.displayName)} — Annual Syllabus</h2>
-    <div style="margin:8px auto 0;width:60px;height:3px;background:#2563eb;border-radius:2px;"></div>
+    <h2 style="margin:0;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.01em;">${escapeHtml(doc.grade.displayName)} — ${escapeHtml(doc.term)}</h2>
+    <div style="margin:8px auto 0;width:60px;height:4px;background:#1e40af;border-radius:2px;"></div>
   </div>
   <div>${subjects || `<div style="border-radius:10px;border:1px dashed #cbd5e1;padding:36px 16px;text-align:center;font-size:13px;color:#64748b;">No syllabus entries have been compiled for this grade yet.</div>`}</div>
   <div style="margin-top:30px;padding-top:14px;border-top:1px solid #e2e8f0;text-align:center;">
@@ -783,9 +783,10 @@ export function CoordinatorDashboard({ user }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Terms</SelectItem>
+                    <SelectItem value="all">Annual Syllabus</SelectItem>
                     <SelectItem value="Term 1">Term 1</SelectItem>
                     <SelectItem value="Term 2">Term 2</SelectItem>
+                    <SelectItem value="Mid-Term">Mid-Term</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

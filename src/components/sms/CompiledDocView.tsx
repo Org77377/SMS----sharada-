@@ -53,12 +53,12 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
             }}
           />
         </div>
-        {/* Line after header */}
+        {/* Line after header — dark and thick for print visibility */}
         <div
           style={{
             margin: "14px 0 10px",
-            height: 2,
-            background: C.primary,
+            height: 3,
+            background: C.primaryDark,
             borderRadius: 1,
           }}
         />
@@ -105,14 +105,14 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
               letterSpacing: "-0.01em",
             }}
           >
-            {doc.grade.displayName} — Annual Syllabus
+            {doc.grade.displayName} — {doc.term}
           </h2>
           <div
             style={{
               margin: "8px auto 0",
               width: 60,
-              height: 3,
-              background: C.primary,
+              height: 4,
+              background: C.primaryDark,
               borderRadius: 2,
             }}
           />
@@ -215,7 +215,7 @@ export const CompiledDocView = forwardRef<HTMLDivElement, Props>(
                           gap: 8,
                           marginBottom: 8,
                           padding: "5px 0",
-                          borderBottom: `2px solid ${C.primary}`,
+                          borderBottom: `3px solid ${C.primaryDark}`,
                           width: "fit-content",
                         }}
                       >
