@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -9,8 +8,6 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.space-z.ai", "*.chatglm.cn"],
   // Prevent the dev server file watcher from triggering recompiles when
   // non-source files change (database, logs, Prisma cache, etc.).
-  // This stops the "auto-refresh on all devices when one user updates data"
-  // issue that occurs in dev mode.
   watchOptions: {
     ignored: [
       "**/db/**",
