@@ -138,7 +138,7 @@ export default function Home() {
   const canSubmitSyllabus = isReviewerRole && assignments.length > 0;
 
   const rightSlot = isSuperadmin ? (
-    <div className="hidden items-center gap-1 rounded-xl bg-slate-100 p-1 sm:flex">
+    <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
       <Button
         size="sm"
         variant={superadminView === "management" ? "default" : "ghost"}
@@ -149,7 +149,7 @@ export default function Home() {
         }`}
         onClick={() => setSuperadminView("management")}
       >
-        <Settings2 className="h-3.5 w-3.5" /> Management
+        <Settings2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Management</span>
       </Button>
       <Button
         size="sm"
@@ -161,11 +161,11 @@ export default function Home() {
         }`}
         onClick={() => setSuperadminView("review")}
       >
-        <LayoutDashboard className="h-3.5 w-3.5" /> Review Console
+        <LayoutDashboard className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Review Console</span>
       </Button>
     </div>
   ) : canSubmitSyllabus ? (
-    <div className="hidden items-center gap-1 rounded-xl bg-slate-100 p-1 sm:flex">
+    <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
       <Button
         size="sm"
         variant={reviewerView === "review" ? "default" : "ghost"}
@@ -176,7 +176,7 @@ export default function Home() {
         }`}
         onClick={() => setReviewerView("review")}
       >
-        <LayoutDashboard className="h-3.5 w-3.5" /> Review Console
+        <LayoutDashboard className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Review Console</span>
       </Button>
       <Button
         size="sm"
@@ -188,7 +188,7 @@ export default function Home() {
         }`}
         onClick={() => setReviewerView("submission")}
       >
-        <BookOpen className="h-3.5 w-3.5" /> My Syllabus
+        <BookOpen className="h-3.5 w-3.5" /> <span className="hidden sm:inline">My Syllabus</span>
       </Button>
     </div>
   ) : undefined;
