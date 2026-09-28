@@ -82,6 +82,18 @@ export function CoordinatorDashboard({ user }: Props) {
   const [editChapters, setEditChapters] = useState<{ chapter: string; topics: string }[]>([{ chapter: "", topics: "" }]);
   const [editSaving, setEditSaving] = useState(false);
 
+  // ---- Approved syllabus browser ----
+  const [approvedUnits, setApprovedUnits] = useState<Unit[]>([]);
+  const [loadingApproved, setLoadingApproved] = useState(false);
+  const [approvedFilter, setApprovedFilter] = useState<string>("all");
+  const [expandedApproved, setExpandedApproved] = useState<string | null>(null);
+  const [editingApprovedId, setEditingApprovedId] = useState<string | null>(null);
+  const [editApprovedChapters, setEditApprovedChapters] = useState<{ chapter: string; topics: string }[]>([{ chapter: "", topics: "" }]);
+  const [editApprovedSaving, setEditApprovedSaving] = useState(false);
+  const [returningUnit, setReturningUnit] = useState<Unit | null>(null);
+  const [returnFeedback, setReturnFeedback] = useState("");
+  const [returning, setReturning] = useState(false);
+
   // ---- Compile ----
   const [allGrades, setAllGrades] = useState<{ id: string; gradeNumber: number; displayName: string }[]>([]);
   const [compileGrade, setCompileGrade] = useState<number>(4);
@@ -230,6 +242,87 @@ export function CoordinatorDashboard({ user }: Props) {
       toast.error((e as Error).message);
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  // ---- Approved syllabus browser ----
+  const loadApproved = useCallback(async () => {
+    setLoadingApproved(true);
+    try {
+      const { units } = await api.units({ status: "APPROVED" });
+      setApprovedUnits(units);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoadingApproved(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "approved") loadApproved();
+  }, [tab, loadApproved]);
+
+  async function handleDeleteApproved(id: string) {
+    if (!confirm("Delete this approved syllabus entry? This cannot be undone.")) return;
+    try {
+      await api.deleteUnit(id);
+      setApprovedUnits((prev) => prev.filter((u) => u.id !== id));
+      toast.success("Approved entry deleted");
+      loadGrid();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  function startEditApproved(u: Unit) {
+    setEditingApprovedId(u.id);
+    const chs = parseChapters(u.chapters);
+    setEditApprovedChapters(chs.length > 0 ? chs : [{ chapter: "", topics: "" }]);
+  }
+
+  async function saveEditApproved() {
+    if (!editingApprovedId) return;
+    const valid = editApprovedChapters.filter((c) => c.chapter.trim() || c.topics.trim());
+    if (valid.length === 0) {
+      toast.error("Add at least one chapter");
+      return;
+    }
+    setEditApprovedSaving(true);
+    try {
+      const autoName = valid.find((c) => c.chapter.trim())?.chapter.trim() || "Untitled";
+      const { unit } = await api.updateUnit(editingApprovedId, {
+        unitName: autoName,
+        chapters: valid,
+      });
+      setApprovedUnits((prev) => prev.map((u) => (u.id === unit.id ? unit : u)));
+      setEditingApprovedId(null);
+      toast.success("Approved entry updated");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setEditApprovedSaving(false);
+    }
+  }
+
+  // Send an approved unit back to the teacher for correction
+  async function handleReturnToTeacher() {
+    if (!returningUnit) return;
+    if (!returnFeedback.trim()) {
+      toast.error("Please provide feedback for the teacher");
+      return;
+    }
+    setReturning(true);
+    try {
+      const { unit } = await api.rejectUnit(returningUnit.id, returnFeedback.trim());
+      setApprovedUnits((prev) => prev.filter((u) => u.id !== returningUnit.id));
+      toast.success("Sent back to teacher for correction");
+      setReturningUnit(null);
+      setReturnFeedback("");
+      loadGrid();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setReturning(false);
     }
   }
 
@@ -572,6 +665,9 @@ export function CoordinatorDashboard({ user }: Props) {
                   {submittedUnits.length}
                 </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="approved" className="gap-1.5">
+            <CheckCircle2 className="h-4 w-4" /> Approved
           </TabsTrigger>
           <TabsTrigger value="compile" className="gap-1.5">
             <FileText className="h-4 w-4" /> Compile &amp; Export
@@ -938,6 +1034,247 @@ export function CoordinatorDashboard({ user }: Props) {
           )}
         </TabsContent>
 
+        {/* APPROVED SYLLABUS */}
+        <TabsContent value="approved" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                Approved Syllabus
+                <span className="text-xs font-normal text-slate-400">
+                  ({approvedUnits.length})
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500">
+                View, edit, or return approved entries for correction.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={loadApproved} disabled={loadingApproved}>
+              <RefreshCw className={`h-4 w-4 ${loadingApproved ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+
+          {/* Grade filter */}
+          <div className="flex flex-wrap gap-2">
+            <Select value={approvedFilter} onValueChange={setApprovedFilter}>
+              <SelectTrigger className="h-8 w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                {allGrades.map((g) => (
+                  <SelectItem key={g.id} value={String(g.gradeNumber)}>
+                    {g.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loadingApproved ? (
+            <div className="flex justify-center py-16 text-slate-400">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : approvedUnits.length === 0 ? (
+            <Card className="border-dashed border-slate-300 p-10 text-center">
+              <CheckCircle2 className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm text-slate-500">No approved syllabus entries found.</p>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {approvedUnits
+                .filter((u) => {
+                  if (approvedFilter === "all") return true;
+                  return String(u.grade?.gradeNumber) === approvedFilter;
+                })
+                .map((u) => {
+                  const chs = parseChapters(u.chapters);
+                  const isExpanded = expandedApproved === u.id;
+                  const isEditing = editingApprovedId === u.id;
+                  return (
+                    <Card key={u.id} className="overflow-hidden border-slate-200/70">
+                      {/* Accordion header */}
+                      <button
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50/70"
+                        onClick={() => setExpandedApproved(isExpanded ? null : u.id)}
+                      >
+                        <div className="shrink-0">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-slate-400" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold text-slate-900">
+                              {u.unitName}
+                            </h3>
+                            <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-[10px]">
+                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Approved
+                            </Badge>
+                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 text-[10px]">
+                              {u.grade?.displayName}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-[10px]">
+                              {u.subject?.name}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-[10px]">
+                              {u.term}
+                            </Badge>
+                            {chs.length > 0 && (
+                              <span className="text-[11px] text-slate-400">
+                                {chs.length} chapter{chs.length === 1 ? "" : "s"}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-slate-400">
+                            By {u.createdBy?.name} · Approved {formatDate(u.updatedAt)}
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Expanded content */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/40 p-4">
+                          {isEditing ? (
+                            /* Edit mode */
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-700">Edit approved chapters</span>
+                                <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setEditingApprovedId(null)}>
+                                  Cancel
+                                </Button>
+                              </div>
+                              {editApprovedChapters.map((ch, idx) => (
+                                <div key={idx} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                                  <div className="mb-1.5 flex items-center justify-between">
+                                    <span className="text-[11px] font-semibold text-slate-500">Chapter {idx + 1}</span>
+                                    {editApprovedChapters.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditApprovedChapters(editApprovedChapters.filter((_, i) => i !== idx))}
+                                        className="text-rose-400 hover:text-rose-600"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <Input
+                                      placeholder="Chapter name"
+                                      value={ch.chapter}
+                                      onChange={(e) => setEditApprovedChapters(editApprovedChapters.map((c, i) => i === idx ? { ...c, chapter: e.target.value } : c))}
+                                      className="bg-white text-xs"
+                                    />
+                                    <Input
+                                      placeholder="Topics"
+                                      value={ch.topics}
+                                      onChange={(e) => setEditApprovedChapters(editApprovedChapters.map((c, i) => i === idx ? { ...c, topics: e.target.value } : c))}
+                                      className="bg-white text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() => setEditApprovedChapters([...editApprovedChapters, { chapter: "", topics: "" }])}
+                                  disabled={editApprovedChapters.length >= 10}
+                                >
+                                  + Add Chapter
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700 text-xs"
+                                  onClick={saveEditApproved}
+                                  disabled={editApprovedSaving}
+                                >
+                                  {editApprovedSaving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                                  Save Changes
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Read-only detail view */
+                            <>
+                              {chs.length > 0 ? (
+                                <div className="overflow-hidden rounded-lg border border-slate-200">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="bg-emerald-600 text-left">
+                                        <th className="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white">
+                                          Chapter
+                                        </th>
+                                        <th className="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white">
+                                          Topics
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {chs.map((ch, ci) => (
+                                        <tr key={ci} className={ci % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                                          <td className="border-b border-slate-100 px-3 py-2 font-medium text-slate-800 align-top" style={{ width: "35%" }}>
+                                            {ci + 1}. {ch.chapter || "Untitled"}
+                                          </td>
+                                          <td className="border-b border-slate-100 px-3 py-2 text-slate-600 align-top">
+                                            {ch.topics || "—"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400">No chapters data available.</p>
+                              )}
+
+                              {/* Action bar */}
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 text-xs text-slate-500 hover:bg-slate-100"
+                                  onClick={() => startEditApproved(u)}
+                                >
+                                  <Pencil className="mr-1 h-3 w-3" /> Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 text-xs text-rose-500 hover:bg-rose-50"
+                                  onClick={() => handleDeleteApproved(u.id)}
+                                >
+                                  <Trash2 className="mr-1 h-3 w-3" /> Delete
+                                </Button>
+                                <div className="ml-auto flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 border-amber-200 text-amber-700 hover:bg-amber-50"
+                                    onClick={() => {
+                                      setReturningUnit(u);
+                                      setReturnFeedback("");
+                                    }}
+                                  >
+                                    <Send className="mr-1 h-3 w-3" /> Return to Teacher
+                                  </Button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+            </div>
+          )}
+        </TabsContent>
+
         {/* COMPILE & EXPORT */}
         <TabsContent value="compile" className="space-y-4">
           <Card className="border-slate-200/70 p-4 sms-dashboard-controls">
@@ -1230,6 +1567,37 @@ export function CoordinatorDashboard({ user }: Props) {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Return approved unit to teacher dialog */}
+      <Dialog open={!!returningUnit} onOpenChange={(o) => !o && setReturningUnit(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Return to teacher for correction</DialogTitle>
+            <DialogDescription>
+              {returningUnit?.unitName} ({returningUnit?.grade?.displayName} · {returningUnit?.subject?.name})
+              {" — "}this approved entry will be sent back to {returningUnit?.createdBy?.name} for correction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label className="text-xs">Feedback for the teacher</Label>
+            <Textarea
+              rows={4}
+              placeholder="Explain what needs to be corrected..."
+              value={returnFeedback}
+              onChange={(e) => setReturnFeedback(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReturningUnit(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReturnToTeacher} disabled={returning || !returnFeedback.trim()} className="bg-amber-600 hover:bg-amber-700">
+              {returning ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
+              Return to Teacher
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject dialog */}
       <Dialog open={!!rejecting} onOpenChange={(o) => !o && setRejecting(null)}>

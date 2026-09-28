@@ -23,10 +23,9 @@ export async function GET(req: NextRequest) {
     where.createdById = session.payload.userId;
   } else {
     // Reviewers (HOD/EC/Principal/Superadmin):
-    // - If status=SUBMITTED (review queue), scope by department for HODs
-    // - Otherwise show all (for compile/status purposes, department scoping is
-    //   applied at the status-grid / compile endpoints which already filter)
-    if (status === "SUBMITTED") {
+    // Apply department scoping for HODs on SUBMITTED and APPROVED units
+    // (so HODs only see their department's submissions and approved syllabus)
+    if (status === "SUBMITTED" || status === "APPROVED") {
       const scope = await getDepartmentScope(session);
       if (scope.subjectIds) {
         where.subjectId = { in: scope.subjectIds };
